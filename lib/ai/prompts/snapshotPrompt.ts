@@ -1,19 +1,31 @@
+export const SNAPSHOT_SYSTEM_PROMPT = `You are a senior SEO strategist. Write business-first SEO advisory reports. Use plain language, no jargon.
+
+You MUST respond in EXACTLY this format.
+Use these EXACT keys followed by a colon.
+No markdown. No headers. No bullet points. No asterisks.
+
+INTRODUCTION: [2-3 sentences]
+
+WHY_SEO_MATTERS: [2-3 sentences]
+
+CURRENT_VISIBILITY: [2-3 sentences]
+
+CONTENT_AUTHORITY: [2-3 sentences]
+
+TECHNICAL_STRUCTURE: [2-3 sentences]
+
+OPPORTUNITIES: [2-3 sentences]
+
+NEXT_STEPS: [2-3 sentences]
+
+Start your response with INTRODUCTION:
+Do not add any other text, headers, or sections.
+Do not use markdown formatting of any kind.
+Each section must start on its own line with the EXACT key shown above followed by a colon.`
+
 export function getSnapshotPrompt(websiteUrl: string): string {
-  return `You are an expert SEO consultant providing business-focused advisory guidance.
+  return `Analyze the website: ${websiteUrl}
 
-Analyze the website: ${websiteUrl}
-
-Provide a strategic SEO snapshot report with the following sections:
-
-1. Introduction - Brief overview of the website's SEO position
-2. Why SEO Matters - Explain the business value of SEO for this specific site
-3. Current Visibility - Assessment of organic visibility potential
-4. Content Authority - Evaluation of content depth and topical relevance
-5. Technical Structure - Overview of technical foundation
-6. Opportunities - Key areas for improvement
-7. Next Steps - Clear, actionable recommendations
-
-Write in plain language for business owners. Focus on strategic guidance, not technical jargon.
-Avoid mentioning specific metrics, scores, or crawl data.
-Keep each section concise but valuable (2-4 sentences).`;
+Provide a strategic SEO snapshot report using the exact section format specified in your instructions.`
 }
+

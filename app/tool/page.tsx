@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LoadingState from '@/components/ui/LoadingState';
 
@@ -16,35 +16,49 @@ export default function ToolPage() {
   );
 }
 
+function isValidInput(url: string): boolean {
+  const cleaned = url.trim()
+  if (!cleaned) return false
+  const withProtocol = cleaned.startsWith('http')
+    ? cleaned
+    : 'https://' + cleaned
+  try {
+    const u = new URL(withProtocol)
+    return u.hostname.includes('.')
+  } catch {
+    return false
+  }
+}
+
+function normalizeUrl(url: string): string {
+  const cleaned = url.trim()
+  return cleaned.startsWith('http') ? cleaned : 'https://' + cleaned
+}
+
 function ToolContent() {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const hasAutoTriggered = useRef(false);
 
-  useEffect(() => {
-    const urlParam = searchParams.get('url');
-    if (urlParam) {
-      setUrl(urlParam);
-    }
-  }, [searchParams]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!url.trim()) return;
+  const handleGenerate = useCallback(async (inputUrl: string) => {
+    if (!isValidInput(inputUrl)) return;
 
     setIsLoading(true);
+    const normalized = normalizeUrl(inputUrl);
 
     try {
       const response = await fetch('/api/report/snapshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ websiteUrl: url.trim() }),
+        body: JSON.stringify({ websiteUrl: normalized }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        router.push(`/report?data=${encodeURIComponent(JSON.stringify(data))}`);
+        sessionStorage.setItem('reportData', JSON.stringify(data));
+        router.push('/report');
       } else {
         alert('Failed to generate report. Please try again.');
         setIsLoading(false);
@@ -54,6 +68,20 @@ function ToolContent() {
       alert('An error occurred. Please try again.');
       setIsLoading(false);
     }
+  }, [router]);
+
+  useEffect(() => {
+    const urlParam = searchParams.get('url');
+    if (urlParam && !hasAutoTriggered.current) {
+      hasAutoTriggered.current = true;
+      setUrl(urlParam);
+      handleGenerate(urlParam);
+    }
+  }, [searchParams, handleGenerate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    handleGenerate(url);
   };
 
   if (isLoading) {
@@ -107,12 +135,11 @@ function ToolContent() {
           <form onSubmit={handleSubmit}>
             <input
               id="website-url"
-              type="url"
+              type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com"
+              placeholder="yourdomain.com"
               className="input input-hero mb-4"
-              required
               aria-label="Website URL"
             />
             <button type="submit" className="btn btn-primary btn-lg pulse w-full justify-center">

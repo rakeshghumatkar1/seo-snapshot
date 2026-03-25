@@ -4,15 +4,34 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+function isValidInput(url: string): boolean {
+  const cleaned = url.trim()
+  if (!cleaned) return false
+  const withProtocol = cleaned.startsWith('http')
+    ? cleaned
+    : 'https://' + cleaned
+  try {
+    const u = new URL(withProtocol)
+    return u.hostname.includes('.')
+  } catch {
+    return false
+  }
+}
+
+function normalizeUrl(url: string): string {
+  const cleaned = url.trim()
+  return cleaned.startsWith('http') ? cleaned : 'https://' + cleaned
+}
+
 export default function Home() {
   const [url, setUrl] = useState('');
   const router = useRouter();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (url.trim()) {
-      router.push(`/tool?url=${encodeURIComponent(url.trim())}`);
-    }
+    if (!isValidInput(url)) return;
+    const normalized = normalizeUrl(url);
+    router.push(`/tool?url=${encodeURIComponent(normalized)}`);
   };
 
   return (
@@ -61,12 +80,11 @@ export default function Home() {
         <form onSubmit={handleSubmit} className="fade-up delay-3 w-full" style={{ maxWidth: '540px', marginTop: '44px' }}>
           <div className="flex gap-2.5 flex-col xs:flex-row">
             <input
-              type="url"
+              type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="yourdomain.com"
               className="input input-hero flex-1"
-              required
             />
             <button type="submit" className="btn btn-primary btn-lg pulse whitespace-nowrap">
               Analyze Free
@@ -107,7 +125,7 @@ export default function Home() {
       <section className="max-w-5xl mx-auto px-6 py-24">
         <div className="text-center mb-16">
           <div className="badge badge-emerald mx-auto mb-4">WHY IT MATTERS</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)', maxWidth: '640px', margin: '0 auto' }}>
+          <h2 className="section-heading-gradient" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)', maxWidth: '640px', margin: '0 auto' }}>
             The Unfair Advantage Your Competitors Don&apos;t Want You to Have
           </h2>
         </div>
@@ -145,7 +163,7 @@ export default function Home() {
       <section className="py-24">
         <div className="max-w-4xl mx-auto px-6 text-center mb-16">
           <div className="badge badge-emerald mx-auto mb-4">SIMPLE PROCESS</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)' }}>
+          <h2 className="section-heading-gradient" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)' }}>
             Three Steps to Strategic Clarity
           </h2>
         </div>
@@ -175,7 +193,7 @@ export default function Home() {
       <section className="py-24">
         <div className="max-w-4xl mx-auto px-6 text-center mb-16">
           <div className="badge badge-emerald mx-auto mb-4">COMPARE</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)' }}>
+          <h2 className="section-heading-gradient" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)' }}>
             Choose Your Level of Insight
           </h2>
         </div>
@@ -222,7 +240,7 @@ export default function Home() {
           <div className="glass-elevated p-10 sm:p-16 text-center relative">
             {/* Glow line */}
             <div className="absolute top-0 left-0 right-0 z-10" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--em-500), transparent)' }} />
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)', marginBottom: '16px' }}>
+            <h2 className="section-heading-gradient" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--t-100)', marginBottom: '16px' }}>
               Ready to See What Your Website Is Missing?
             </h2>
             <p style={{ fontFamily: 'var(--font-body)', fontSize: '18px', color: 'var(--t-200)', lineHeight: 1.7, maxWidth: '480px', margin: '0 auto 32px' }}>

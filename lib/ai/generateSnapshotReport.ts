@@ -1,16 +1,30 @@
 import { ReportResponse } from '@/types/report';
-import { getSnapshotPrompt } from './prompts/snapshotPrompt';
-import { callAIProvider } from './provider';
-import { parseReport } from './parseReport';
+import { getSnapshotPrompt, SNAPSHOT_SYSTEM_PROMPT } from './prompts/snapshotPrompt';
+import { generateWithAI } from './provider';
+import { parseSnapshotReport } from './parseReport';
 
 export async function generateSnapshotReport(websiteUrl: string): Promise<ReportResponse> {
   const prompt = getSnapshotPrompt(websiteUrl);
-  const aiResponse = await callAIProvider(prompt);
-  const parsedSections = parseReport(aiResponse, 'snapshot');
-  
+
+  const result = await generateWithAI({
+    prompt,
+    systemPrompt: SNAPSHOT_SYSTEM_PROMPT,
+  });
+
+  if (!result.success || !result.text) {
+    throw new Error(result.error || 'Failed to generate report');
+  }
+
+  const parsedSections = parseSnapshotReport(result.text);
+
+  if (!parsedSections) {
+    throw new Error('Failed to parse AI response into report sections');
+  }
+
   return {
     type: 'snapshot',
     websiteUrl,
     sections: parsedSections,
   };
 }
+

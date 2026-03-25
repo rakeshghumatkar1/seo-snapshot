@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ReportResponse, SnapshotSections } from '@/types/report';
 import { FeatureConfig } from '@/types/config';
 import ReportHeader from '@/components/report/ReportHeader';
@@ -36,6 +36,7 @@ export default function ReportPage() {
 }
 
 function ReportContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [config, setConfig] = useState<FeatureConfig | null>(null);
@@ -45,23 +46,51 @@ function ReportContent() {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
+    // Try sessionStorage first (primary data flow)
+    const stored = sessionStorage.getItem('reportData');
+    if (stored) {
+      try {
+        const parsedData = JSON.parse(stored);
+        setReport(parsedData);
+        setChecked(true);
+        return;
+      } catch (error) {
+        console.error('Failed to parse stored report data:', error);
+      }
+    }
+
+    // Fallback: try URL query param (legacy)
     const dataParam = searchParams.get('data');
     if (dataParam) {
       try {
         const parsedData = JSON.parse(decodeURIComponent(dataParam));
         setReport(parsedData);
+        setChecked(true);
+        return;
       } catch (error) {
-        console.error('Failed to parse report data:', error);
+        console.error('Failed to parse report data from URL:', error);
       }
     }
 
+    // No data found — redirect to tool page
+    setChecked(true);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (checked && !report) {
+      router.push('/tool');
+    }
+  }, [checked, report, router]);
+
+  useEffect(() => {
     fetch('/api/config')
       .then(res => res.json())
       .then(data => setConfig(data))
       .catch(err => console.error('Failed to load config:', err));
-  }, [searchParams]);
+  }, []);
 
   const handleDownloadPDF = () => {
     if (config?.requireEmailForPDF) {
@@ -134,6 +163,7 @@ function ReportContent() {
 
       if (response.ok) {
         const detailedData = await response.json();
+        sessionStorage.setItem('reportData', JSON.stringify(detailedData));
         setReport(detailedData);
       }
     } catch (error) {

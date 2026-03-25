@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateSnapshotReport } from '@/lib/ai/generateSnapshotReport';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/rateLimit/getIp';
+import { insertReport } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,6 +44,17 @@ export async function POST(request: NextRequest) {
     const cleanUrl = websiteUrl.trim().replace(/\/+$/, '');
 
     const report = await generateSnapshotReport(cleanUrl);
+
+    // Log report asynchronously
+    insertReport({
+      websiteUrl: cleanUrl,
+      reportType: 'snapshot',
+      email: undefined,
+      status: 'success',
+      sectionsJson: report.sections,
+    }).catch(err =>
+      console.error('[Snapshot] Report log failed:', err)
+    );
 
     return NextResponse.json(report);
   } catch (error) {

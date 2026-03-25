@@ -23,6 +23,10 @@ interface Stats {
     activeIps: number
     totalRequests: number
   }
+  todayActivity?: {
+    requests: number
+    uniqueIps: number
+  }
   dailyLeads: Array<{ date: string; count: number }>
   topDomains: Array<{ website_url: string; count: number }>
   ratingDistribution: Array<{ rating: number; count: number }>
@@ -228,8 +232,8 @@ export default function AdminDashboard() {
             },
             {
               label: 'Active Users Today',
-              value: stats.rateLimits.activeIps,
-              sub: `${stats.rateLimits.totalRequests} total requests`,
+              value: stats.todayActivity?.uniqueIps || stats.rateLimits.activeIps,
+              sub: `${stats.todayActivity?.requests || stats.rateLimits.totalRequests} requests today`,
               color: '#3b82f6',
             },
           ].map(card => (

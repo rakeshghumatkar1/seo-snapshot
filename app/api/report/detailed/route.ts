@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateDetailedReport } from '@/lib/ai/generateDetailedReport';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/rateLimit/getIp';
+import { insertReport } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +61,17 @@ export async function POST(request: NextRequest) {
     }
 
     const report = await generateDetailedReport(cleanUrl);
+
+    // Log report asynchronously
+    insertReport({
+      websiteUrl: cleanUrl,
+      reportType: 'detailed',
+      email: email,
+      status: 'success',
+      sectionsJson: report.sections,
+    }).catch(err =>
+      console.error('[Detailed] Report log failed:', err)
+    );
 
     return NextResponse.json(report);
   } catch (error) {

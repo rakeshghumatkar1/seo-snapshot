@@ -141,6 +141,40 @@ export async function insertRating({
   }
 }
 
+export async function insertReport({
+  websiteUrl,
+  reportType,
+  email,
+  status,
+  sectionsJson,
+}: {
+  websiteUrl: string
+  reportType: string
+  email?: string
+  status: string
+  sectionsJson?: object
+}) {
+  try {
+    await dbQuery(
+      `INSERT INTO reports 
+       (website_url, report_type, email, status, sections_json)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        websiteUrl,
+        reportType,
+        email || null,
+        status,
+        sectionsJson ? JSON.stringify(sectionsJson) : null,
+      ]
+    )
+    console.log('[DB] Report logged:', reportType, websiteUrl)
+    return { success: true }
+  } catch (err: any) {
+    console.error('[DB] Report insert failed:', err?.message)
+    return { success: false }
+  }
+}
+
 export async function getConfig(): Promise<Record<string, boolean>> {
   const defaults: Record<string, boolean> = {
     enableDetailedReport: true,

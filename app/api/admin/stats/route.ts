@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
       dailyReportsResult,
       topDomainsResult,
       ratingStatsResult,
+      todayActivityResult,
     ] = await Promise.all([
       dbQuery(
         `SELECT COUNT(*) as total,
@@ -40,7 +41,8 @@ export async function GET(req: NextRequest) {
          FROM reports`
       ),
       dbQuery(
-        `SELECT COUNT(*) as total_ips,
+        `SELECT 
+          COUNT(DISTINCT ip_address) as total_ips,
           COALESCE(SUM(request_count), 0) as total_requests
          FROM rate_limits
          WHERE reset_at > NOW()`
@@ -72,6 +74,14 @@ export async function GET(req: NextRequest) {
          GROUP BY rating
          ORDER BY rating DESC`
       ),
+      dbQuery(
+        `SELECT 
+          COALESCE(SUM(request_count), 0) as today_requests,
+          COUNT(DISTINCT ip_address) as unique_ips
+         FROM rate_limits
+         WHERE reset_at > NOW()
+           AND first_request_at > NOW() - INTERVAL '24 hours'`
+      ),
     ])
 
     return NextResponse.json({
@@ -93,6 +103,10 @@ export async function GET(req: NextRequest) {
       rateLimits: {
         activeIps: Number(rateLimitsResult[0]?.total_ips || 0),
         totalRequests: Number(rateLimitsResult[0]?.total_requests || 0),
+      },
+      todayActivity: {
+        requests: Number(todayActivityResult[0]?.today_requests || 0),
+        uniqueIps: Number(todayActivityResult[0]?.unique_ips || 0),
       },
       dailyLeads: dailyLeadsResult,
       dailyReports: dailyReportsResult,

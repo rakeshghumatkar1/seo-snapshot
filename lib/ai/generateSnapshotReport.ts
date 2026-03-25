@@ -1,10 +1,10 @@
 import { ReportResponse } from '@/types/report';
-import { getSnapshotPrompt, SNAPSHOT_SYSTEM_PROMPT } from './prompts/snapshotPrompt';
+import { buildSnapshotPrompt, SNAPSHOT_SYSTEM_PROMPT } from './prompts/snapshotPrompt';
 import { generateWithAI } from './provider';
 import { parseSnapshotReport } from './parseReport';
 
 export async function generateSnapshotReport(websiteUrl: string): Promise<ReportResponse> {
-  const prompt = getSnapshotPrompt(websiteUrl);
+  const prompt = buildSnapshotPrompt(websiteUrl);
 
   const result = await generateWithAI({
     prompt,

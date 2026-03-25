@@ -1,14 +1,14 @@
 import { ReportResponse } from '@/types/report';
-import { getDetailedPrompt } from './prompts/detailedPrompt';
+import { buildDetailedPrompt, DETAILED_SYSTEM_PROMPT } from './prompts/detailedPrompt';
 import { generateWithAI } from './provider';
 import { parseDetailedReport } from './parseReport';
 
 export async function generateDetailedReport(websiteUrl: string): Promise<ReportResponse> {
-  const prompt = getDetailedPrompt(websiteUrl);
+  const prompt = buildDetailedPrompt(websiteUrl);
 
   const result = await generateWithAI({
     prompt,
-    systemPrompt: 'You are an expert SEO consultant providing comprehensive business-focused advisory guidance. Respond using EXACT section keys in ALL CAPS followed by a colon. No markdown headers, no bullet points, just plain paragraphs.',
+    systemPrompt: DETAILED_SYSTEM_PROMPT,
   });
 
   if (!result.success || !result.text) {

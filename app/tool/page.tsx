@@ -38,6 +38,12 @@ function normalizeUrl(url: string): string {
 function ToolContent() {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rateLimitData, setRateLimitData] = useState<{
+    retryAfterMs: number
+    retryAfterFormatted: string
+    resetAt: number
+  } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const hasAutoTriggered = useRef(false);
@@ -46,6 +52,8 @@ function ToolContent() {
     if (!isValidInput(inputUrl)) return;
 
     setIsLoading(true);
+    setError(null);
+    setRateLimitData(null);
     const normalized = normalizeUrl(inputUrl);
 
     try {
@@ -55,17 +63,32 @@ function ToolContent() {
         body: JSON.stringify({ websiteUrl: normalized }),
       });
 
-      if (response.ok) {
+      if (response.status === 429) {
         const data = await response.json();
-        sessionStorage.setItem('reportData', JSON.stringify(data));
-        router.push('/report');
-      } else {
-        alert('Failed to generate report. Please try again.');
+        setRateLimitData({
+          retryAfterMs: data.retryAfterMs,
+          retryAfterFormatted: data.retryAfterFormatted,
+          resetAt: data.resetAt,
+        });
+        setError('rate_limited');
         setIsLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error generating report:', error);
-      alert('An error occurred. Please try again.');
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to generate report');
+      }
+
+      const data = await response.json();
+      console.log('API response:', data);
+      console.log('Sections:', data.sections);
+
+      sessionStorage.setItem('reportData', JSON.stringify(data));
+      router.push('/report');
+    } catch (err: any) {
+      console.error('Error generating report:', err);
+      setError(err.message || 'Something went wrong. Please check your connection and try again.');
       setIsLoading(false);
     }
   }, [router]);
@@ -83,6 +106,53 @@ function ToolContent() {
     e.preventDefault();
     handleGenerate(url);
   };
+
+  if (error === 'rate_limited' && rateLimitData) {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        <div className="w-full max-w-lg mx-auto px-6">
+          <RateLimitScreen
+            resetAt={rateLimitData.resetAt}
+            onBack={() => { setError(null); setRateLimitData(null); router.push('/'); }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
+        <div className="w-full max-w-lg mx-auto px-6">
+          <div className="glass-elevated p-10 text-center">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#ef4444' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 700, color: 'var(--t-100)', marginBottom: '8px' }}>
+              Report Generation Failed
+            </h2>
+            <p style={{ fontFamily: 'var(--font-body)', fontSize: '15px', color: 'var(--t-300)', lineHeight: 1.7, marginBottom: '24px' }}>
+              {error}
+            </p>
+            <button
+              onClick={() => { setError(null); handleGenerate(url); }}
+              className="btn btn-primary btn-lg justify-center"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => { setError(null); }}
+              className="btn btn-ghost justify-center mt-3"
+            >
+              Change URL
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -160,4 +230,118 @@ function ToolContent() {
       </div>
     </div>
   );
+}
+
+function RateLimitScreen({ resetAt, onBack }: { resetAt: number; onBack: () => void }) {
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    function update() {
+      const ms = resetAt - Date.now()
+      if (ms <= 0) {
+        setTimeLeft('Ready!')
+        return
+      }
+      const hours = Math.floor(ms / 3600000)
+      const mins = Math.floor((ms % 3600000) / 60000)
+      const secs = Math.floor((ms % 60000) / 1000)
+      if (hours > 0) {
+        setTimeLeft(`${hours}h ${mins}m ${secs}s`)
+      } else if (mins > 0) {
+        setTimeLeft(`${mins}m ${secs}s`)
+      } else {
+        setTimeLeft(`${secs}s`)
+      }
+    }
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [resetAt])
+
+  return (
+    <div className="glass" style={{
+      maxWidth: '480px',
+      margin: '0 auto',
+      padding: '48px 32px',
+      textAlign: 'center',
+    }}>
+      <div style={{
+        width: '64px',
+        height: '64px',
+        borderRadius: '50%',
+        background: 'rgba(16,185,129,0.1)',
+        border: '1px solid rgba(16,185,129,0.25)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: '0 auto 24px',
+        fontSize: '28px',
+      }}>
+        ⏱
+      </div>
+
+      <h2 style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: '24px',
+        fontWeight: 700,
+        color: 'var(--t-100)',
+        marginBottom: '12px',
+      }}>
+        Daily Limit Reached
+      </h2>
+
+      <p style={{
+        fontSize: '15px',
+        color: 'var(--t-200)',
+        lineHeight: 1.6,
+        marginBottom: '32px',
+      }}>
+        You've used your 20 free reports for today.
+        Your limit resets in:
+      </p>
+
+      <div style={{
+        background: 'rgba(16,185,129,0.08)',
+        border: '1px solid rgba(16,185,129,0.25)',
+        borderRadius: '16px',
+        padding: '24px',
+        marginBottom: '32px',
+      }}>
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '40px',
+          fontWeight: 800,
+          color: 'var(--em-400)',
+          letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {timeLeft}
+        </div>
+        <div style={{
+          fontSize: '13px',
+          color: 'var(--t-300)',
+          marginTop: '8px',
+        }}>
+          until your reports reset
+        </div>
+      </div>
+
+      <p style={{
+        fontSize: '13px',
+        color: 'var(--t-300)',
+        marginBottom: '24px',
+      }}>
+        Need more reports? Generate a Detailed
+        Report to save your analysis for later.
+      </p>
+
+      <button
+        className="btn btn-secondary"
+        onClick={onBack}
+        style={{ width: '100%' }}
+      >
+        ← Back to Home
+      </button>
+    </div>
+  )
 }

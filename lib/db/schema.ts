@@ -55,6 +55,21 @@ export async function setupDatabase() {
       ON CONFLICT (key) DO NOTHING
     `)
 
+    await dbQuery(`
+      CREATE TABLE IF NOT EXISTS rate_limits (
+        ip_address VARCHAR(45) PRIMARY KEY,
+        request_count INTEGER NOT NULL DEFAULT 1,
+        first_request_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        reset_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `)
+
+    await dbQuery(`
+      CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_at 
+      ON rate_limits(reset_at)
+    `)
+
     console.log('[DB] Schema ready')
     return { success: true }
   } catch (err: any) {

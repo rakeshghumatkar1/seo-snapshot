@@ -1,12 +1,26 @@
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless'
 
-export function getDbClient() {
-  const databaseUrl = process.env.DATABASE_URL;
-  
-  if (!databaseUrl) {
-    console.warn('DATABASE_URL not set, database operations will fail');
-    return null;
+if (!process.env.DATABASE_URL) {
+  console.warn('DATABASE_URL not set — DB features disabled')
+}
+
+export const sql = process.env.DATABASE_URL
+  ? neon(process.env.DATABASE_URL)
+  : null
+
+export async function dbQuery(
+  query: string,
+  params: any[] = []
+): Promise<any[]> {
+  if (!sql) {
+    console.warn('[DB] No database configured')
+    return []
   }
-  
-  return neon(databaseUrl);
+  try {
+    const result = await sql(query, params)
+    return result as any[]
+  } catch (err: any) {
+    console.error('[DB Error]', err?.message)
+    return []
+  }
 }

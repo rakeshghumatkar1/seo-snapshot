@@ -47,6 +47,7 @@ function ReportContent() {
   const [company, setCompany] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   useEffect(() => {
     // Try sessionStorage first (primary data flow)
@@ -93,11 +94,12 @@ function ReportContent() {
   }, []);
 
   const handleDownloadPDF = () => {
+    setModalError(null);
     if (config?.requireEmailForPDF) {
       setModalAction('pdf');
       setShowEmailModal(true);
     } else {
-      alert('PDF download feature coming soon!');
+      triggerPDFDownload();
     }
   };
 
@@ -110,10 +112,68 @@ function ReportContent() {
     }
   };
 
+  const triggerPDFDownload = async () => {
+    if (!report) return;
+    setIsSubmitting(true);
+    setModalError(null);
+
+    try {
+      const response = await fetch('/api/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim() || undefined,
+          name: name.trim() || undefined,
+          company: company.trim() || undefined,
+          websiteUrl: report.websiteUrl,
+          sections: report.sections,
+          reportType: report.type,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'PDF generation failed');
+      }
+
+      // Open print dialog — works on all browsers
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(data.html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 800);
+      } else {
+        // Fallback: download as HTML file
+        const blob = new Blob([data.html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.filename || 'seo-report.html';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      setShowEmailModal(false);
+      setEmail('');
+      setName('');
+      setCompany('');
+    } catch (err: any) {
+      console.error('[PDF]', err);
+      setModalError(err.message || 'Could not generate PDF. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleModalSubmit = async () => {
     if (!email.trim()) return;
 
     setIsSubmitting(true);
+    setModalError(null);
 
     try {
       await fetch('/api/leads', {
@@ -130,17 +190,16 @@ function ReportContent() {
 
       if (modalAction === 'detailed') {
         await generateDetailedReport();
+        setShowEmailModal(false);
+        setEmail('');
+        setName('');
+        setCompany('');
       } else {
-        alert('PDF download feature coming soon!');
+        await triggerPDFDownload();
       }
-
-      setShowEmailModal(false);
-      setEmail('');
-      setName('');
-      setCompany('');
     } catch (error) {
       console.error('Error submitting:', error);
-      alert('An error occurred. Please try again.');
+      setModalError('An error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -312,6 +371,12 @@ function ReportContent() {
           >
             Cancel
           </button>
+
+          {modalError && (
+            <p style={{ color: '#ef4444', fontSize: '13px', textAlign: 'center', marginTop: '8px' }}>
+              {modalError}
+            </p>
+          )}
 
           <p className="text-center mt-1" style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--t-400)' }}>
             🔒 Your email is never shared or sold.

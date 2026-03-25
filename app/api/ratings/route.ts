@@ -1,37 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDbClient } from '@/lib/db/client';
+import { NextRequest, NextResponse } from 'next/server'
+import { insertRating } from '@/lib/db/schema'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { websiteUrl, email, rating, comment } = body;
+    const body = await req.json()
+    const { websiteUrl, email, rating, comment } = body
 
-    if (!websiteUrl || !rating || rating < 1 || rating > 5) {
+    if (!rating || rating < 1 || rating > 5) {
       return NextResponse.json(
-        { error: 'Valid website URL and rating (1-5) are required' },
+        { error: 'Rating must be 1-5' },
         { status: 400 }
-      );
+      )
     }
 
-    const db = getDbClient();
-    
-    if (db) {
-      try {
-        await db`
-          INSERT INTO ratings (website_url, email, rating, comment)
-          VALUES (${websiteUrl}, ${email || null}, ${rating}, ${comment || null})
-        `;
-      } catch (dbError) {
-        console.error('Database error (non-critical):', dbError);
-      }
-    }
+    await insertRating({
+      websiteUrl,
+      email,
+      rating: Number(rating),
+      comment,
+    })
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error saving rating:', error);
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('[API/ratings]', err)
     return NextResponse.json(
-      { error: 'Failed to save rating' },
+      { error: 'Failed to save rating.' },
       { status: 500 }
-    );
+    )
   }
 }

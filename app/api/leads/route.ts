@@ -1,37 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDbClient } from '@/lib/db/client';
+import { NextRequest, NextResponse } from 'next/server'
+import { insertLead } from '@/lib/db/schema'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, name, company, websiteUrl, actionType } = body;
+    const body = await req.json()
+    const { email, name, company, websiteUrl, actionType } = body
 
-    if (!email || !websiteUrl || !actionType) {
+    if (!email?.trim()) {
       return NextResponse.json(
-        { error: 'Email, website URL, and action type are required' },
+        { error: 'Email is required' },
         { status: 400 }
-      );
+      )
     }
 
-    const db = getDbClient();
-    
-    if (db) {
-      try {
-        await db`
-          INSERT INTO leads (email, name, company, website_url, requested_report_type)
-          VALUES (${email}, ${name || null}, ${company || null}, ${websiteUrl}, ${actionType})
-        `;
-      } catch (dbError) {
-        console.error('Database error (non-critical):', dbError);
-      }
-    }
+    await insertLead({
+      email,
+      name,
+      company,
+      websiteUrl,
+      requestedReportType: actionType || 'detailed',
+    })
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error saving lead:', error);
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('[API/leads]', err)
     return NextResponse.json(
-      { error: 'Failed to save lead' },
+      { error: 'Failed to save.' },
       { status: 500 }
-    );
+    )
   }
 }

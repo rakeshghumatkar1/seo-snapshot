@@ -1,29 +1,61 @@
-import { ReportResponse } from '@/types/report';
-import { buildDetailedPrompt, DETAILED_SYSTEM_PROMPT } from './prompts/detailedPrompt';
-import { generateWithAI } from './provider';
-import { parseDetailedReport } from './parseReport';
+import { generateWithAI } from './provider'
+import {
+  DETAILED_SYSTEM_PROMPT,
+  buildDetailedPrompt,
+} from './prompts/detailedPrompt'
+import { parseDetailedReport } from './parseReport'
+import { fetchWebsiteContent } from './fetchWebsite'
+import type { DetailedSections } from '@/types/report'
 
-export async function generateDetailedReport(websiteUrl: string): Promise<ReportResponse> {
-  const prompt = buildDetailedPrompt(websiteUrl);
+export async function generateDetailedReport(
+  websiteUrl: string
+): Promise<{
+  sections: DetailedSections
+  raw?: string
+} | null> {
+
+  // Fetch real website content first
+  console.log('[Detailed] Fetching website:', websiteUrl)
+  const websiteContent = await fetchWebsiteContent(
+    websiteUrl
+  )
+
+  if (websiteContent.error) {
+    console.warn(
+      '[Detailed] Fetch failed, continuing without content:',
+      websiteContent.error
+    )
+  } else {
+    console.log(
+      '[Detailed] Website fetched, title:',
+      websiteContent.title
+    )
+  }
+
+  // Build prompt with real content
+  const prompt = buildDetailedPrompt(
+    websiteUrl,
+    websiteContent.error ? undefined : websiteContent
+  )
 
   const result = await generateWithAI({
     prompt,
     systemPrompt: DETAILED_SYSTEM_PROMPT,
-  });
+  })
 
   if (!result.success || !result.text) {
-    throw new Error(result.error || 'Failed to generate report');
+    console.error(
+      '[Detailed] Generation failed:', result.error
+    )
+    return null
   }
 
-  const parsedSections = parseDetailedReport(result.text);
+  const sections = parseDetailedReport(result.text)
 
-  if (!parsedSections) {
-    throw new Error('Failed to parse AI response into report sections');
+  if (!sections) {
+    console.error('[Detailed] Parsing failed')
+    return null
   }
 
-  return {
-    type: 'detailed',
-    websiteUrl,
-    sections: parsedSections,
-  };
+  return { sections, raw: result.text }
 }

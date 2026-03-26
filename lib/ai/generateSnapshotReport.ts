@@ -1,30 +1,61 @@
-import { ReportResponse } from '@/types/report';
-import { buildSnapshotPrompt, SNAPSHOT_SYSTEM_PROMPT } from './prompts/snapshotPrompt';
-import { generateWithAI } from './provider';
-import { parseSnapshotReport } from './parseReport';
+import { generateWithAI } from './provider'
+import {
+  SNAPSHOT_SYSTEM_PROMPT,
+  buildSnapshotPrompt,
+} from './prompts/snapshotPrompt'
+import { parseSnapshotReport } from './parseReport'
+import { fetchWebsiteContent } from './fetchWebsite'
+import type { SnapshotSections } from '@/types/report'
 
-export async function generateSnapshotReport(websiteUrl: string): Promise<ReportResponse> {
-  const prompt = buildSnapshotPrompt(websiteUrl);
+export async function generateSnapshotReport(
+  websiteUrl: string
+): Promise<{
+  sections: SnapshotSections
+  raw?: string
+} | null> {
+
+  // Fetch real website content first
+  console.log('[Snapshot] Fetching website:', websiteUrl)
+  const websiteContent = await fetchWebsiteContent(
+    websiteUrl
+  )
+
+  if (websiteContent.error) {
+    console.warn(
+      '[Snapshot] Fetch failed, continuing without content:',
+      websiteContent.error
+    )
+  } else {
+    console.log(
+      '[Snapshot] Website fetched, title:',
+      websiteContent.title
+    )
+  }
+
+  // Build prompt with real content
+  const prompt = buildSnapshotPrompt(
+    websiteUrl,
+    websiteContent.error ? undefined : websiteContent
+  )
 
   const result = await generateWithAI({
     prompt,
     systemPrompt: SNAPSHOT_SYSTEM_PROMPT,
-  });
+  })
 
   if (!result.success || !result.text) {
-    throw new Error(result.error || 'Failed to generate report');
+    console.error(
+      '[Snapshot] Generation failed:', result.error
+    )
+    return null
   }
 
-  const parsedSections = parseSnapshotReport(result.text);
+  const sections = parseSnapshotReport(result.text)
 
-  if (!parsedSections) {
-    throw new Error('Failed to parse AI response into report sections');
+  if (!sections) {
+    console.error('[Snapshot] Parsing failed')
+    return null
   }
 
-  return {
-    type: 'snapshot',
-    websiteUrl,
-    sections: parsedSections,
-  };
+  return { sections, raw: result.text }
 }
-

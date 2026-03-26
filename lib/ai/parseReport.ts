@@ -1,155 +1,170 @@
 import type { SnapshotSections, DetailedSections } from '@/types/report'
 
-const ALL_KEYS = [
-  'INTRODUCTION',
-  'WHY_SEO_MATTERS',
-  'CURRENT_VISIBILITY',
-  'CONTENT_AUTHORITY',
-  'TECHNICAL_STRUCTURE',
-  'OPPORTUNITIES',
-  'NEXT_STEPS',
-  'CURRENT_POSITIONING',
-  'TECHNICAL_REVIEW',
-  'COMPETITOR_PRESENCE',
-  'KEYWORD_DIRECTION',
-  'CONTENT_STRATEGY',
-  'ROADMAP',
-  'CONCLUSION',
-]
-
-function parseAllSections(text: string): Record<string, string> {
+function parseAllSections(
+  text: string,
+  keys: string[]
+): Record<string, string> {
   const result: Record<string, string> = {}
 
-  for (let i = 0; i < ALL_KEYS.length; i++) {
-    const key = ALL_KEYS[i]
-    const nextKey = ALL_KEYS[i + 1]
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]
+    const nextKey = keys[i + 1]
 
-    // Find where this key starts
-    const keyIndex = text.indexOf(key + ':')
-    if (keyIndex === -1) continue
+    const keyWithColon = key + ':'
+    const keyIndex = text.indexOf(keyWithColon)
 
-    // Content starts after "KEY:"
-    const contentStart = keyIndex + key.length + 1
-
-    // Find where next key starts (scan all remaining keys, pick closest)
-    let nextKeyIndex = text.length
-    for (let j = i + 1; j < ALL_KEYS.length; j++) {
-      const idx = text.indexOf(ALL_KEYS[j] + ':', contentStart)
-      if (idx !== -1 && idx < nextKeyIndex) {
-        nextKeyIndex = idx
-        break
-      }
+    if (keyIndex === -1) {
+      console.warn('[Parser] Key not found:', key)
+      result[key] = ''
+      continue
     }
+
+    const contentStart = keyIndex + keyWithColon.length
+
+    const nextKeyIndex = nextKey
+      ? text.indexOf(nextKey + ':')
+      : -1
+
+    const contentEnd =
+      nextKeyIndex > contentStart
+        ? nextKeyIndex
+        : text.length
 
     const content = text
-      .substring(contentStart, nextKeyIndex)
+      .substring(contentStart, contentEnd)
       .trim()
-      .replace(/^#+\s*/gm, '')
-      .replace(/\*\*/g, '')
-      .replace(/\n+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
       .trim()
 
-    if (content.length > 10) {
-      result[key] = content
-    }
+    result[key] = content
   }
 
   return result
 }
 
-function toCamelCase(key: string): string {
-  return key
-    .toLowerCase()
-    .replace(/_([a-z])/g, (_, c) => c.toUpperCase())
-}
-
-export function parseSnapshotReport(aiText: string): SnapshotSections | null {
+export function parseSnapshotReport(
+  aiText: string
+): SnapshotSections | null {
   try {
-    console.log('[Parser] Input preview:', aiText.substring(0, 500))
-
-    const raw = parseAllSections(aiText)
-
-    console.log('[Parser] Extracted keys:',
-      Object.entries(raw).map(([k, v]) => `${k}:${v.length}`).join(', ')
+    console.log(
+      '[Parser] Snapshot input preview:',
+      aiText.substring(0, 300)
     )
 
-    const snapshotKeys = [
-      'INTRODUCTION', 'WHY_SEO_MATTERS', 'CURRENT_VISIBILITY',
-      'CONTENT_AUTHORITY', 'TECHNICAL_STRUCTURE', 'OPPORTUNITIES', 'NEXT_STEPS',
+    const keys = [
+      'INTRODUCTION',
+      'WHY_SEO_MATTERS',
+      'FIRST_IMPRESSION',
+      'CONTENT_VISIBILITY',
+      'COMPETITOR_PRESENCE',
+      'KEYWORD_OPPORTUNITIES',
+      'TECHNICAL_OBSERVATIONS',
+      'WHAT_CAN_BE_IMPROVED',
+      'NEXT_STEPS',
+      'CONCLUSION',
     ]
 
-    // Check if ANY section has real content
-    const hasContent = snapshotKeys.some(k => (raw[k]?.length || 0) > 30)
+    const raw = parseAllSections(aiText, keys)
+
+    const sections: SnapshotSections = {
+      introduction: raw['INTRODUCTION'] || '',
+      whySeoMatters: raw['WHY_SEO_MATTERS'] || '',
+      firstImpression: raw['FIRST_IMPRESSION'] || '',
+      contentVisibility: raw['CONTENT_VISIBILITY'] || '',
+      competitorPresence: raw['COMPETITOR_PRESENCE'] || '',
+      keywordOpportunities: raw['KEYWORD_OPPORTUNITIES'] || '',
+      technicalObservations: raw['TECHNICAL_OBSERVATIONS'] || '',
+      whatCanBeImproved: raw['WHAT_CAN_BE_IMPROVED'] || '',
+      nextSteps: raw['NEXT_STEPS'] || '',
+      conclusion: raw['CONCLUSION'] || '',
+    }
+
+    const hasContent = Object.values(sections)
+      .some(v => v.length > 30)
 
     if (!hasContent) {
-      console.error('[Parser] Zero extraction — full text:', aiText.substring(0, 1000))
+      console.error(
+        '[Parser] No content extracted. Full text:',
+        aiText.substring(0, 500)
+      )
       return null
     }
 
-    const fallbacks = getSnapshotFallbacks()
-    const sections: SnapshotSections = {
-      introduction: raw['INTRODUCTION'] || fallbacks.introduction,
-      whySeoMatters: raw['WHY_SEO_MATTERS'] || fallbacks.whySeoMatters,
-      currentVisibility: raw['CURRENT_VISIBILITY'] || fallbacks.currentVisibility,
-      contentAuthority: raw['CONTENT_AUTHORITY'] || fallbacks.contentAuthority,
-      technicalStructure: raw['TECHNICAL_STRUCTURE'] || fallbacks.technicalStructure,
-      opportunities: raw['OPPORTUNITIES'] || fallbacks.opportunities,
-      nextSteps: raw['NEXT_STEPS'] || fallbacks.nextSteps,
-    }
+    console.log(
+      '[Parser] Snapshot keys extracted:',
+      Object.entries(sections)
+        .map(([k, v]) => `${k}:${v.length}`)
+        .join(', ')
+    )
 
     return sections
   } catch (err) {
-    console.error('[Parser] Error:', err)
+    console.error('[Parser] Snapshot error:', err)
     return null
   }
 }
 
-export function parseDetailedReport(aiText: string): DetailedSections | null {
+export function parseDetailedReport(
+  aiText: string
+): DetailedSections | null {
   try {
-    const snapshot = parseSnapshotReport(aiText)
-    if (!snapshot) return null
+    console.log(
+      '[Parser] Detailed input preview:',
+      aiText.substring(0, 300)
+    )
 
-    const raw = parseAllSections(aiText)
-    const fallbacks = getDetailedFallbacks()
+    const keys = [
+      'INTRODUCTION',
+      'WHY_SEO_MATTERS',
+      'WEBSITE_POSITIONING',
+      'CONTENT_STRATEGY',
+      'COMPETITOR_LANDSCAPE',
+      'KEYWORD_DIRECTION',
+      'TECHNICAL_SIGNALS',
+      'AUTHORITY_TRUST',
+      'SEO_ROADMAP',
+      'DETAILED_RECOMMENDATIONS',
+      'NEXT_STEPS',
+      'CONCLUSION',
+    ]
 
-    const detailed: DetailedSections = {
-      ...snapshot,
-      currentPositioning: raw['CURRENT_POSITIONING'] || fallbacks.currentPositioning,
-      technicalReview: raw['TECHNICAL_REVIEW'] || fallbacks.technicalReview,
-      competitorPresence: raw['COMPETITOR_PRESENCE'] || fallbacks.competitorPresence,
-      keywordDirection: raw['KEYWORD_DIRECTION'] || fallbacks.keywordDirection,
-      contentStrategy: raw['CONTENT_STRATEGY'] || fallbacks.contentStrategy,
-      roadmap: raw['ROADMAP'] || fallbacks.roadmap,
-      conclusion: raw['CONCLUSION'] || fallbacks.conclusion,
+    const raw = parseAllSections(aiText, keys)
+
+    const sections: DetailedSections = {
+      introduction: raw['INTRODUCTION'] || '',
+      whySeoMatters: raw['WHY_SEO_MATTERS'] || '',
+      websitePositioning: raw['WEBSITE_POSITIONING'] || '',
+      contentStrategy: raw['CONTENT_STRATEGY'] || '',
+      competitorLandscape: raw['COMPETITOR_LANDSCAPE'] || '',
+      keywordDirection: raw['KEYWORD_DIRECTION'] || '',
+      technicalSignals: raw['TECHNICAL_SIGNALS'] || '',
+      authorityTrust: raw['AUTHORITY_TRUST'] || '',
+      seoRoadmap: raw['SEO_ROADMAP'] || '',
+      detailedRecommendations: raw['DETAILED_RECOMMENDATIONS'] || '',
+      nextSteps: raw['NEXT_STEPS'] || '',
+      conclusion: raw['CONCLUSION'] || '',
     }
 
-    return detailed
+    const hasContent = Object.values(sections)
+      .some(v => v.length > 30)
+
+    if (!hasContent) {
+      console.error(
+        '[Parser] No detailed content extracted.'
+      )
+      return null
+    }
+
+    console.log(
+      '[Parser] Detailed keys extracted:',
+      Object.entries(sections)
+        .map(([k, v]) => `${k}:${v.length}`)
+        .join(', ')
+    )
+
+    return sections
   } catch (err) {
     console.error('[Parser] Detailed error:', err)
     return null
-  }
-}
-
-function getSnapshotFallbacks(): SnapshotSections {
-  return {
-    introduction: 'Your website shows real potential for organic growth. This report outlines the key areas where focused effort will drive the strongest results.',
-    whySeoMatters: 'Organic search is the highest-ROI channel for most businesses. Investing in SEO now builds a compounding asset that pays dividends for years.',
-    currentVisibility: 'Your current organic presence has room to grow. The good news is that the fundamentals are in place to build from.',
-    contentAuthority: 'Building topical authority through consistent, focused content is your clearest path to stronger search visibility.',
-    technicalStructure: 'Your technical foundation is workable. Some structural improvements will help search engines better understand your content.',
-    opportunities: 'Content depth, internal linking, and clearer page purpose are your highest-leverage opportunities right now.',
-    nextSteps: 'Start by auditing your core service pages for clarity and depth. Then build a content calendar around your primary topics.',
-  }
-}
-
-function getDetailedFallbacks(): Omit<DetailedSections, keyof SnapshotSections> {
-  return {
-    currentPositioning: 'Your positioning in organic search reflects an early-stage presence with significant upside available.',
-    technicalReview: 'The site structure supports basic indexing. Improvements in page speed and internal architecture will compound results.',
-    competitorPresence: 'Competitors in your space are investing in content and authority-building. There is meaningful space to differentiate.',
-    keywordDirection: 'Focus on intent-matched keywords that reflect your buyers decision journey rather than high-volume generic terms.',
-    contentStrategy: 'A pillar-and-cluster content model built around your core service topics will build authority most efficiently.',
-    roadmap: 'Month one: core page optimization. Month two: supporting content creation. Month three: link building and authority signals.',
-    conclusion: 'The opportunity ahead is significant. With focused execution on the priorities outlined here, meaningful organic growth is achievable within 90 days.',
   }
 }

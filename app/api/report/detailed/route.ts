@@ -60,7 +60,20 @@ export async function POST(request: NextRequest) {
       console.error('Lead storage failed (non-critical):', leadErr);
     }
 
-    const report = await generateDetailedReport(cleanUrl);
+    const result = await generateDetailedReport(cleanUrl);
+
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Failed to generate detailed report. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    const report = {
+      type: 'detailed' as const,
+      websiteUrl: cleanUrl,
+      sections: result.sections,
+    };
 
     // Log report asynchronously
     insertReport({
@@ -68,7 +81,7 @@ export async function POST(request: NextRequest) {
       reportType: 'detailed',
       email: email,
       status: 'success',
-      sectionsJson: report.sections,
+      sectionsJson: result.sections,
     }).catch(err =>
       console.error('[Detailed] Report log failed:', err)
     );

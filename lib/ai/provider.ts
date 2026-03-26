@@ -1,13 +1,16 @@
-import Groq from 'groq-sdk'
+import OpenAI from 'openai'
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
+let _openai: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  return _openai
+}
 
 export interface AIProviderInput {
   prompt: string
   systemPrompt: string
-  model?: string
 }
 
 export interface AIProviderOutput {
@@ -19,19 +22,25 @@ export interface AIProviderOutput {
 export async function generateWithAI(
   input: AIProviderInput
 ): Promise<AIProviderOutput> {
-  const provider = process.env.AI_PROVIDER || 'mock'
+  const provider = process.env.AI_PROVIDER || 'openai'
+
+  console.log('[AI] Using provider:', provider)
+  console.log('[AI] API Key present:', !!process.env.OPENAI_API_KEY)
 
   if (provider === 'mock') {
+    console.log('[AI] Using mock response')
     return {
-      text: getMockResponse(input.prompt),
+      text: getMockResponse(),
       success: true,
     }
   }
 
-  if (provider === 'groq') {
+  if (provider === 'openai') {
     try {
-      const completion = await groq.chat.completions.create({
-        model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      console.log('[OpenAI] Calling GPT-4 Turbo...')
+
+      const completion = await getOpenAI().chat.completions.create({
+        model: 'gpt-4-turbo',
         messages: [
           {
             role: 'system',
@@ -42,23 +51,26 @@ export async function generateWithAI(
             content: input.prompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 2048,
+        temperature: 0.3,
+        max_tokens: 3000,
       })
 
       const text = completion.choices[0]?.message?.content || ''
 
       if (!text) {
+        console.error('[OpenAI] Empty response received')
         return {
           text: '',
           success: false,
-          error: 'Empty response from AI provider',
+          error: 'Empty response from OpenAI',
         }
       }
 
+      console.log('[OpenAI] Success, length:', text.length)
       return { text, success: true }
+
     } catch (err: any) {
-      console.error('[Groq Error]', err?.message)
+      console.error('[OpenAI Error]', err?.message)
       return {
         text: '',
         success: false,
@@ -74,35 +86,24 @@ export async function generateWithAI(
   }
 }
 
-function getMockResponse(prompt: string): string {
-  return `
-INTRODUCTION: Your website has a solid foundation, but several 
-key SEO opportunities remain untapped. This report gives you a 
-high-level view of where you stand and what matters most.
+function getMockResponse(): string {
+  return `INTRODUCTION: This is a mock report for testing.
 
-WHY_SEO_MATTERS: Over 90% of online experiences begin with a 
-search engine. Without strong organic presence, your business 
-is invisible to customers actively searching for what you offer.
+WHY_SEO_MATTERS: SEO matters for this business.
 
-CURRENT_VISIBILITY: Based on your website structure and content 
-signals, your current organic visibility is limited. Your site 
-is not fully optimized for the queries your ideal customers use.
+FIRST_IMPRESSION: The website appears professional.
 
-CONTENT_AUTHORITY: Your content shows topical relevance but 
-lacks the depth needed to build authority in your niche. This 
-is one of the highest-leverage areas for improvement.
+CONTENT_VISIBILITY: Content appears moderate.
 
-TECHNICAL_STRUCTURE: The technical foundation is functional 
-but structural improvements would help search engines better 
-understand and index your content.
+COMPETITOR_PRESENCE: Competitors seem active.
 
-OPPORTUNITIES: The strongest opportunities are content 
-expansion, clearer site structure, and improving how pages 
-communicate their purpose to users and search engines.
+KEYWORD_OPPORTUNITIES: Several opportunities appear available.
 
-NEXT_STEPS: Focus first on clarifying core pages, then build 
-supporting content around your main services. Clear structure 
-and relevant content will drive the most results short term.
-  `
+TECHNICAL_OBSERVATIONS: Structure appears functional.
+
+WHAT_CAN_BE_IMPROVED: Several areas could be strengthened.
+
+NEXT_STEPS: A detailed report would help.
+
+CONCLUSION: Good potential for growth.`
 }
-

@@ -6,6 +6,10 @@ import { insertReport } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Snapshot Route] Called')
+    console.log('[Snapshot Route] AI_PROVIDER:', process.env.AI_PROVIDER)
+    console.log('[Snapshot Route] OPENAI_KEY present:', !!process.env.OPENAI_API_KEY)
+
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(ip);
 
@@ -43,7 +47,20 @@ export async function POST(request: NextRequest) {
 
     const cleanUrl = websiteUrl.trim().replace(/\/+$/, '');
 
-    const report = await generateSnapshotReport(cleanUrl);
+    const result = await generateSnapshotReport(cleanUrl);
+
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Failed to generate report. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    const report = {
+      type: 'snapshot' as const,
+      websiteUrl: cleanUrl,
+      sections: result.sections,
+    };
 
     // Log report asynchronously
     insertReport({
@@ -51,7 +68,7 @@ export async function POST(request: NextRequest) {
       reportType: 'snapshot',
       email: undefined,
       status: 'success',
-      sectionsJson: report.sections,
+      sectionsJson: result.sections,
     }).catch(err =>
       console.error('[Snapshot] Report log failed:', err)
     );

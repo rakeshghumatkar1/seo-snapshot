@@ -1,25 +1,35 @@
 export interface SnapshotSections {
   introduction: string
   whySeoMatters: string
-  currentVisibility: string
-  contentAuthority: string
-  technicalStructure: string
-  opportunities: string
-  nextSteps: string
-}
-
-export interface DetailedSections extends SnapshotSections {
-  currentPositioning: string
-  technicalReview: string
+  firstImpression: string
+  contentVisibility: string
   competitorPresence: string
-  keywordDirection: string
-  contentStrategy: string
-  roadmap: string
+  keywordOpportunities: string
+  technicalObservations: string
+  whatCanBeImproved: string
+  nextSteps: string
   conclusion: string
 }
+
+export interface DetailedSections {
+  introduction: string
+  whySeoMatters: string
+  websitePositioning: string
+  contentStrategy: string
+  competitorLandscape: string
+  keywordDirection: string
+  technicalSignals: string
+  authorityTrust: string
+  seoRoadmap: string
+  detailedRecommendations: string
+  nextSteps: string
+  conclusion: string
+}
+
+export type ReportSections = SnapshotSections | DetailedSections
 
 export interface ReportResponse {
   type: 'snapshot' | 'detailed'
   websiteUrl: string
-  sections: SnapshotSections | DetailedSections
+  sections: ReportSections
 }

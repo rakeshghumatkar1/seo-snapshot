@@ -5,20 +5,24 @@ export interface PDFReportData {
 }
 
 const SECTION_LABELS: Record<string, { category: string; title: string }> = {
-  introduction: { category: 'OVERVIEW', title: 'Executive Summary' },
-  whySeoMatters: { category: 'CONTEXT', title: 'Why This Matters' },
-  currentVisibility: { category: 'CURRENT STATE', title: 'Your Organic Visibility' },
-  contentAuthority: { category: 'AUTHORITY', title: 'Content & Topic Strength' },
-  technicalStructure: { category: 'INFRASTRUCTURE', title: 'Technical Foundation' },
-  opportunities: { category: 'OPPORTUNITIES', title: 'Highest-Leverage Growth Areas' },
-  nextSteps: { category: 'ACTION PLAN', title: 'Recommended Next Steps' },
-  currentPositioning: { category: 'POSITIONING', title: 'Current Market Position' },
-  technicalReview: { category: 'TECHNICAL', title: 'Technical Review' },
-  competitorPresence: { category: 'COMPETITION', title: 'Competitive Landscape' },
-  keywordDirection: { category: 'KEYWORDS', title: 'Keyword Direction' },
+  introduction: { category: 'OVERVIEW', title: 'Introduction' },
+  whySeoMatters: { category: 'CONTEXT', title: 'Why SEO Matters' },
+  firstImpression: { category: 'FIRST LOOK', title: 'First Impression' },
+  contentVisibility: { category: 'CONTENT', title: 'Content & Visibility' },
+  competitorPresence: { category: 'COMPETITION', title: 'Competitor Presence' },
+  keywordOpportunities: { category: 'KEYWORDS', title: 'Keyword Opportunities' },
+  technicalObservations: { category: 'TECHNICAL', title: 'Technical Observations' },
+  whatCanBeImproved: { category: 'IMPROVEMENTS', title: 'What Can Be Improved' },
+  websitePositioning: { category: 'POSITIONING', title: 'Website Positioning' },
   contentStrategy: { category: 'CONTENT', title: 'Content Strategy' },
-  roadmap: { category: 'ROADMAP', title: '90-Day Action Plan' },
-  conclusion: { category: 'CONCLUSION', title: 'Final Recommendations' },
+  competitorLandscape: { category: 'COMPETITION', title: 'Competitor Landscape' },
+  keywordDirection: { category: 'KEYWORDS', title: 'Keyword Direction' },
+  technicalSignals: { category: 'TECHNICAL', title: 'Technical Signals' },
+  authorityTrust: { category: 'AUTHORITY', title: 'Authority & Trust' },
+  seoRoadmap: { category: 'ROADMAP', title: 'SEO Roadmap' },
+  detailedRecommendations: { category: 'RECOMMENDATIONS', title: 'Detailed Recommendations' },
+  nextSteps: { category: 'ACTION', title: 'Next Steps' },
+  conclusion: { category: 'SUMMARY', title: 'Conclusion' },
 }
 
 export function buildPDFHTML(data: PDFReportData): string {

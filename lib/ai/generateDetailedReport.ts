@@ -14,28 +14,36 @@ export async function generateDetailedReport(
   raw?: string
 } | null> {
 
-  // Fetch real website content first
   console.log('[Detailed] Fetching website:', websiteUrl)
+
   const websiteContent = await fetchWebsiteContent(
     websiteUrl
   )
 
-  if (websiteContent.error) {
-    console.warn(
-      '[Detailed] Fetch failed, continuing without content:',
-      websiteContent.error
-    )
-  } else {
-    console.log(
-      '[Detailed] Website fetched, title:',
-      websiteContent.title
-    )
-  }
+  const pagesFound =
+    1 + websiteContent.additionalPages.length
 
-  // Build prompt with real content
+  console.log('[Detailed] Pages collected:', pagesFound)
+
+  // Build content context for prompt
+  const contentContext = websiteContent.allText
+    ? `
+WEBSITE RESEARCH DATA:
+Domain: ${websiteContent.domain}
+Pages analyzed: ${pagesFound} page(s) found
+
+${websiteContent.allText}
+
+END OF WEBSITE DATA
+
+Use the above real website content to make your report specific to this business.
+Base all observations on what is actually visible in the content above.
+`
+    : ''
+
   const prompt = buildDetailedPrompt(
     websiteUrl,
-    websiteContent.error ? undefined : websiteContent
+    contentContext
   )
 
   const result = await generateWithAI({

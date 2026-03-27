@@ -67,6 +67,9 @@ function ReportContent() {
   const [checked, setChecked] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [generatingDetailed, setGeneratingDetailed] = useState(false);
+  const [capturedEmail, setCapturedEmail] = useState('');
+  const [capturedName, setCapturedName] = useState('');
+  const [capturedCompany, setCapturedCompany] = useState('');
 
   useEffect(() => {
     // Try sessionStorage first (primary data flow)
@@ -112,9 +115,31 @@ function ReportContent() {
       .catch(err => console.error('Failed to load config:', err));
   }, []);
 
+  useEffect(() => {
+    const savedEmail = sessionStorage.getItem('userEmail') || '';
+    const savedName = sessionStorage.getItem('userName') || '';
+    const savedCompany = sessionStorage.getItem('userCompany') || '';
+    if (savedEmail) {
+      setCapturedEmail(savedEmail);
+      setCapturedName(savedName);
+      setCapturedCompany(savedCompany);
+    }
+  }, []);
+
+  const saveUserInfo = (e: string, n: string, c: string) => {
+    setCapturedEmail(e);
+    setCapturedName(n);
+    setCapturedCompany(c);
+    sessionStorage.setItem('userEmail', e);
+    sessionStorage.setItem('userName', n);
+    sessionStorage.setItem('userCompany', c);
+  };
+
   const handleDownloadPDF = () => {
     setModalError(null);
-    if (config?.requireEmailForPDF) {
+    if (capturedEmail) {
+      triggerPDFDownload(capturedEmail, capturedName, capturedCompany);
+    } else if (config?.requireEmailForPDF) {
       setModalAction('pdf');
       setShowEmailModal(true);
     } else {
@@ -123,7 +148,10 @@ function ReportContent() {
   };
 
   const handleGenerateDetailed = () => {
-    if (config?.requireEmailForDetailed) {
+    if (capturedEmail) {
+      setGeneratingDetailed(true);
+      generateDetailedReport(capturedEmail, capturedName, capturedCompany);
+    } else if (config?.requireEmailForDetailed) {
       setModalAction('detailed');
       setShowEmailModal(true);
     } else {
@@ -132,19 +160,23 @@ function ReportContent() {
     }
   };
 
-  const triggerPDFDownload = async () => {
+  const triggerPDFDownload = async (useEmail?: string, useName?: string, useCompany?: string) => {
     if (!report) return;
     setIsSubmitting(true);
     setModalError(null);
+
+    const finalEmail = useEmail || email.trim() || '';
+    const finalName = useName || name.trim() || '';
+    const finalCompany = useCompany || company.trim() || '';
 
     try {
       const response = await fetch('/api/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim() || undefined,
-          name: name.trim() || undefined,
-          company: company.trim() || undefined,
+          email: finalEmail || undefined,
+          name: finalName || undefined,
+          company: finalCompany || undefined,
           websiteUrl: report.websiteUrl,
           sections: report.sections,
           reportType: report.type,
@@ -208,17 +240,22 @@ function ReportContent() {
         }),
       });
 
+      const submittedEmail = email.trim();
+      const submittedName = name.trim();
+      const submittedCompany = company.trim();
+      saveUserInfo(submittedEmail, submittedName, submittedCompany);
+
       if (modalAction === 'detailed') {
         setShowEmailModal(false);
         setIsSubmitting(false);
         setGeneratingDetailed(true);
-        await generateDetailedReport();
+        await generateDetailedReport(submittedEmail, submittedName, submittedCompany);
         setGeneratingDetailed(false);
         setEmail('');
         setName('');
         setCompany('');
       } else {
-        await triggerPDFDownload();
+        await triggerPDFDownload(submittedEmail, submittedName, submittedCompany);
       }
     } catch (error) {
       console.error('Error submitting:', error);
@@ -228,8 +265,12 @@ function ReportContent() {
     }
   };
 
-  const generateDetailedReport = async () => {
+  const generateDetailedReport = async (useEmail?: string, useName?: string, useCompany?: string) => {
     if (!report) return;
+
+    const finalEmail = useEmail || email.trim() || capturedEmail || '';
+    const finalName = useName || name.trim() || capturedName || '';
+    const finalCompany = useCompany || company.trim() || capturedCompany || '';
 
     try {
       const response = await fetch('/api/report/detailed', {
@@ -237,9 +278,9 @@ function ReportContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           websiteUrl: report.websiteUrl,
-          email: email.trim() || undefined,
-          name: name.trim() || undefined,
-          company: company.trim() || undefined,
+          email: finalEmail || undefined,
+          name: finalName || undefined,
+          company: finalCompany || undefined,
         }),
       });
 
@@ -292,29 +333,39 @@ function ReportContent() {
 
       {/* Action Bar */}
       <div className="glass p-6 mt-8 mb-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          {config?.enablePDFDownload && (
-            <button onClick={handleDownloadPDF} className="btn btn-secondary w-full sm:w-auto justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Download PDF Report
-            </button>
-          )}
-          {config?.enableDetailedReport && report.type === 'snapshot' && (
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+          {report.type === 'snapshot' && config?.enableDetailedReport && (
             <button onClick={handleGenerateDetailed} className="btn btn-primary btn-lg pulse w-full sm:w-auto justify-center">
               Generate Detailed Report →
             </button>
           )}
+          {report.type === 'detailed' && config?.enablePDFDownload && (
+            <button onClick={handleDownloadPDF} className="btn btn-primary btn-lg w-full sm:w-auto justify-center">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Download Full Report PDF →
+            </button>
+          )}
+          {report.type === 'detailed' && capturedEmail && (
+            <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--t-400)', marginTop: '-4px' }}>
+              Downloading as {capturedEmail}
+            </p>
+          )}
         </div>
       </div>
-      <p className="text-center mb-8" style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-400)' }}>
-        Advanced report requires email · Typically 45 seconds
-      </p>
+      {report.type === 'snapshot' && (
+        <p className="text-center mb-8" style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-400)' }}>
+          Detailed report requires email · Typically 45 seconds
+        </p>
+      )}
+      {report.type === 'detailed' && (
+        <div className="mb-8" />
+      )}
 
       {/* Rating Block */}
       {config?.enableRating && (
-        <RatingBlock websiteUrl={report.websiteUrl} email={email} />
+        <RatingBlock websiteUrl={report.websiteUrl} email={capturedEmail || email} />
       )}
 
       {/* CTA Block */}

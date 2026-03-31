@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/providers/Providers";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -40,11 +39,9 @@ export default function RootLayout({
           <div className="mesh-orb-3" aria-hidden="true" />
           <div className="noise-overlay" aria-hidden="true" />
           <div className="relative z-10">
-            <Header />
-            <main id="main-content" className="min-h-screen">
+            <PublicShell>
               {children}
-            </main>
-            <Footer />
+            </PublicShell>
           </div>
         </Providers>
       </body>

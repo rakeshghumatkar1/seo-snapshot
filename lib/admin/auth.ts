@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 
 const COOKIE_NAME = 'admin_session'
-const SESSION_DURATION = 24 * 60 * 60 * 1000
+const SESSION_DURATION = 2 * 60 * 60 * 1000
 
 export function verifyAdminPassword(password: string): boolean {
   return password === process.env.ADMIN_PASSWORD

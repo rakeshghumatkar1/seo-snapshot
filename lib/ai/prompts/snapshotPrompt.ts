@@ -137,6 +137,22 @@ The difference:
 
 Every paragraph you write must pass this test: could this paragraph appear in a report for a completely different business? If yes — rewrite it.
 
+EXAMPLE B — Local service business
+
+BAD:
+"The website has a clean design and appears to offer professional services. Adding more content could help with search visibility."
+
+GOOD:
+"Based on the visible pages of Sharma Plumbing Services, the site currently describes three core offerings — pipe repair, bathroom fitting, and drainage cleaning — but does so in a single short paragraph per service. For a local trade business serving the Andheri and Bandra areas, search engines likely expect more supporting content around each service. Urban Company and Housejoy, which compete for the same local intent searches, appear to have substantially more content per service category."
+
+EXAMPLE C — SaaS product
+
+BAD:
+"The website could benefit from a stronger content strategy. A blog with relevant articles would improve search presence."
+
+GOOD:
+"The platform's homepage leads with the phrase 'automate your hiring pipeline' and the features page describes four workflow stages: sourcing, screening, scheduling, and offer management. However, none of the visible pages appear to address the questions HR managers search for before evaluating a tool. Competitors such as Greenhouse and Lever have built significant presence around exactly these topics."
+
 STYLE RULES
 
 Write in professional consulting style.
@@ -226,6 +242,21 @@ Use these answers to make EVERY section specific to this business.
 Do not write generic observations.
 Do not write advice that applies to every website equally.
 
+MANDATORY PRE-WRITING STEP — complete this silently before writing any section. Use only the WEBSITE RESEARCH DATA already provided in this prompt. Do not ask the user for anything. All data you need is already in this prompt.
+
+In your internal reasoning, identify and lock in:
+
+SITE_NAME: the exact business name from the website title or homepage
+BUSINESS_TYPE: e-commerce / SaaS / local service / education / healthcare / agency / marketplace / other
+EXACT_SERVICES_FOUND: every specific service or product name visible on the site — their exact words, not your paraphrase
+PAGES_THAT_EXIST: every page URL or section found in the data
+PAGES_THAT_ARE_MISSING: pages expected for this business type that were absent from the data
+HEADINGS_FOUND: the actual h1/h2/h3 text from the structured facts — these are the business's own words
+BIGGEST_GAP: the single most important missing SEO element
+TWO_REAL_COMPETITORS: two actual companies competing for the same search audience
+
+Complete this extraction first. Then begin writing INTRODUCTION:. Every paragraph must reference at least one item from this extraction by name.
+
 CRITICAL STRUCTURE RULE
 
 You MUST respond using EXACTLY these 10 section keys in EXACTLY this order.
@@ -292,7 +323,18 @@ export function buildSnapshotPrompt(
     .replace(/\/$/, '')
     .split('/')[0]
 
-  return `${contentContext || ''}
+  const wrappedContext = contentContext
+    ? `WEBSITE RESEARCH DATA — you must reference at least 6 specific items from this data in your report.
+Items = service names, page titles, headings, exact phrases, page URLs, notable absences.
+
+${contentContext.trim()}
+
+END OF WEBSITE DATA
+
+GROUNDING CHECK: After writing your full report, count how many specific items from the above data you referenced by name. If fewer than 6 — go back and strengthen the weakest sections before outputting.`
+    : ''
+
+  return `${wrappedContext}
 
 Now analyze the following website using the research data provided above and general web knowledge.
 

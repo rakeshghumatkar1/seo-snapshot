@@ -11,6 +11,7 @@ function getOpenAI(): OpenAI {
 export interface AIProviderInput {
   prompt: string
   systemPrompt: string
+  reportType?: 'snapshot' | 'detailed'
 }
 
 export interface AIProviderOutput {
@@ -39,6 +40,8 @@ export async function generateWithAI(
     try {
       console.log('[OpenAI] Calling GPT-4 Turbo...')
 
+      const maxTokens = input.reportType === 'detailed' ? 4000 : 3000
+
       const completion = await getOpenAI().chat.completions.create({
         model: 'gpt-4-turbo',
         messages: [
@@ -52,7 +55,7 @@ export async function generateWithAI(
           },
         ],
         temperature: 0.3,
-        max_tokens: 3000,
+        max_tokens: maxTokens,
       })
 
       const text = completion.choices[0]?.message?.content || ''

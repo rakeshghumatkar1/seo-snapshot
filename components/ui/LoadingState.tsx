@@ -3,25 +3,31 @@
 import React, { useState, useEffect } from 'react';
 
 const loadingMessages = [
-  'Connecting to your website\u2026',
-  'Running AI content analysis\u2026',
-  'Mapping your SEO signals\u2026',
-  'Identifying key opportunities\u2026',
-  'Preparing your strategy report\u2026',
+  "Fetching the website pages...",
+  "Reading the homepage content...",
+  "Extracting headings and site structure...",
+  "Identifying services and offerings...",
+  "Checking which pages exist and which are missing...",
+  "Analysing the navigation structure...",
+  "Researching the competitive landscape...",
+  "Identifying keyword opportunities...",
+  "Evaluating content depth and gaps...",
+  "Sarah is writing the SEO report...",
+  "Reviewing trust signals and authority...",
+  "Finalising recommendations...",
+  "Almost done — polishing the report...",
 ];
 
 export default function LoadingState() {
   const [messageIndex, setMessageIndex] = useState(0);
-  const [fadeKey, setFadeKey] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % loadingMessages.length);
-      setFadeKey((prev) => prev + 1);
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, []);
+    if (messageIndex >= loadingMessages.length - 1) return;
+    const timer = setTimeout(() => {
+      setMessageIndex(prev => prev + 1);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [messageIndex]);
 
   return (
     <div className="flex flex-col items-center justify-center py-16">
@@ -31,12 +37,11 @@ export default function LoadingState() {
       {/* Rotating message */}
       <div aria-live="polite" className="text-center mb-10">
         <p
-          key={fadeKey}
-          className="msg-in"
           style={{
             fontFamily: 'var(--font-body)',
             fontSize: '16px',
             color: 'var(--t-200)',
+            transition: 'opacity 0.3s ease',
           }}
         >
           {loadingMessages[messageIndex]}
@@ -55,7 +60,7 @@ export default function LoadingState() {
         className="mt-6 text-center"
         style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-400)' }}
       >
-        Your report will be ready in about 30 seconds
+        This usually takes 20 to 40 seconds
       </p>
     </div>
   );

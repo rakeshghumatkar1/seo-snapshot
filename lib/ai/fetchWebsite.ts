@@ -1,6 +1,8 @@
 export interface PageContent {
   url: string
   title: string
+  headings: string[]
+  navLinks: string[]
   bodyText: string
 }
 
@@ -13,6 +15,78 @@ export interface WebsiteContent {
 }
 
 const FETCH_TIMEOUT = 8000
+
+function extractHeadings(html: string): string[] {
+  const regex = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi
+  const headings: string[] = []
+  let match
+  while ((match = regex.exec(html)) !== null) {
+    const text = match[1]
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (text.length > 2 && text.length < 200) {
+      headings.push(text)
+    }
+  }
+  return [...new Set(headings)].slice(0, 20)
+}
+
+function extractNavLinks(html: string): string[] {
+  const navMatch = html.match(/<nav[\s\S]*?<\/nav>/gi)
+  if (!navMatch) return []
+  const labels: string[] = []
+  for (const nav of navMatch) {
+    const linkRegex = /<a[^>]*>([\s\S]*?)<\/a>/gi
+    let m
+    while ((m = linkRegex.exec(nav)) !== null) {
+      const text = m[1]
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (text.length > 1 && text.length < 60) {
+        labels.push(text)
+      }
+    }
+  }
+  return [...new Set(labels)].slice(0, 15)
+}
+
+function buildStructuredSummary(
+  homepage: PageContent,
+  additionalPages: PageContent[]
+): string {
+  const allHeadings = [
+    ...homepage.headings,
+    ...additionalPages.flatMap(p => p.headings)
+  ]
+  const allNavLinks = [
+    ...homepage.navLinks,
+    ...additionalPages.flatMap(p => p.navLinks)
+  ]
+  const uniqueHeadings = [...new Set(allHeadings)].slice(0, 30)
+  const uniqueNav = [...new Set(allNavLinks)].slice(0, 20)
+  const pageList = [
+    homepage.url,
+    ...additionalPages.map(p => p.url)
+  ]
+
+  return [
+    '=== STRUCTURED WEBSITE FACTS ===',
+    `WEBSITE TITLE: ${homepage.title}`,
+    `PAGES FOUND (${pageList.length}):`,
+    ...pageList.map(u => `  - ${u}`),
+    '',
+    uniqueNav.length > 0
+      ? `NAVIGATION SECTIONS:\n${uniqueNav.map(n => `  - ${n}`).join('\n')}`
+      : '',
+    '',
+    uniqueHeadings.length > 0
+      ? `ALL HEADINGS (exact business language):\n${uniqueHeadings.map(h => `  "${h}"`).join('\n')}`
+      : '',
+    '=== END STRUCTURED FACTS ===',
+  ].filter(Boolean).join('\n')
+}
 
 async function fetchSinglePage(
   url: string
@@ -48,6 +122,10 @@ async function fetchSinglePage(
       ?.trim()
       ?.replace(/\s+/g, ' ') || ''
 
+    // Extract headings and nav links before stripping HTML
+    const headings = extractHeadings(html)
+    const navLinks = extractNavLinks(html)
+
     // Clean HTML to text
     const bodyText = html
       .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -62,11 +140,11 @@ async function fetchSinglePage(
       .replace(/&gt;/g, '>')
       .replace(/\s{2,}/g, ' ')
       .trim()
-      .substring(0, 2000)
+      .substring(0, 3000)
 
     if (bodyText.length < 50) return null
 
-    return { url, title, bodyText }
+    return { url, title, headings, navLinks, bodyText }
 
   } catch (err: any) {
     console.log(
@@ -162,6 +240,8 @@ export async function fetchWebsiteContent(
       homepage: {
         url: websiteUrl,
         title: '',
+        headings: [],
+        navLinks: [],
         bodyText: '',
       },
       additionalPages: [],
@@ -227,17 +307,34 @@ export async function fetchWebsiteContent(
     1 + additionalPages.length
   )
 
-  // Step 4: Combine all text for AI
-  const allText = [
+  // Step 4: Build structured summary and combine all text for AI
+  const structuredSummary = buildStructuredSummary(
+    homepage,
+    additionalPages
+  )
+
+  const pageBlocks = [
     `=== HOMEPAGE (${homepage.url}) ===`,
     `Title: ${homepage.title}`,
+    homepage.headings.length > 0
+      ? `Headings: ${homepage.headings.join(' | ')}`
+      : '',
     homepage.bodyText,
     ...additionalPages.map(p => [
       `=== ${p.url.split('/').slice(-2).join('/')} ===`,
       `Title: ${p.title}`,
+      p.headings.length > 0
+        ? `Headings: ${p.headings.join(' | ')}`
+        : '',
       p.bodyText,
-    ].join('\n')),
-  ].join('\n\n').substring(0, 6000)
+    ].filter(Boolean).join('\n')),
+  ].filter(Boolean).join('\n\n')
+
+  const allText = [
+    structuredSummary,
+    '',
+    pageBlocks,
+  ].join('\n').substring(0, 12000)
 
   return {
     domain,

@@ -5,7 +5,23 @@ import {
 } from './prompts/detailedPrompt'
 import { parseDetailedReport } from './parseReport'
 import { fetchWebsiteContent } from './fetchWebsite'
+import { dbQuery } from '@/lib/db/client'
 import type { DetailedSections } from '@/types/report'
+
+async function getSystemPrompt(key: string, fallback: string): Promise<string> {
+  try {
+    const rows = await dbQuery(
+      `SELECT content FROM prompts WHERE key = $1`,
+      [key]
+    )
+    if (rows.length > 0 && rows[0].content) {
+      return rows[0].content
+    }
+  } catch {
+    // fall through to default
+  }
+  return fallback
+}
 
 export async function generateDetailedReport(
   websiteUrl: string
@@ -46,9 +62,12 @@ Base all observations on what is actually visible in the content above.
     contentContext
   )
 
+  const systemPrompt = await getSystemPrompt('detailed_system_prompt', DETAILED_SYSTEM_PROMPT)
+
   const result = await generateWithAI({
     prompt,
-    systemPrompt: DETAILED_SYSTEM_PROMPT,
+    systemPrompt,
+    reportType: 'detailed',
   })
 
   if (!result.success || !result.text) {

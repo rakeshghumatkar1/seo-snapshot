@@ -70,6 +70,31 @@ export async function setupDatabase() {
       ON rate_limits(reset_at)
     `)
 
+    await dbQuery(`
+      CREATE TABLE IF NOT EXISTS prompts (
+        id SERIAL PRIMARY KEY,
+        key TEXT UNIQUE NOT NULL,
+        content TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `)
+
+    await dbQuery(`
+      INSERT INTO prompts (key, content) VALUES
+        ('snapshot_system_prompt', ''),
+        ('detailed_system_prompt', '')
+      ON CONFLICT (key) DO NOTHING
+    `)
+
+    await dbQuery(`
+      CREATE TABLE IF NOT EXISTS prompt_history (
+        id SERIAL PRIMARY KEY,
+        key TEXT NOT NULL,
+        content TEXT NOT NULL,
+        saved_at TIMESTAMP DEFAULT NOW()
+      )
+    `)
+
     console.log('[DB] Schema ready')
     return { success: true }
   } catch (err: any) {

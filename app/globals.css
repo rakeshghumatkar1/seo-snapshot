@@ -2006,7 +2006,7 @@ body:has(.public-site) .noise-overlay {
   display: none;
   position: absolute;
   top: 50%;
-  width: clamp(180px, 18vw, 300px);
+  width: clamp(180px, 14vw, 260px);
   transform: translateY(-48%);
   color: var(--tb-cyan-400);
   opacity: 0.1;
@@ -2025,11 +2025,11 @@ body:has(.public-site) .noise-overlay {
 }
 
 .public-hero-decor-left {
-  left: clamp(-100px, -5vw, -42px);
+  left: clamp(24px, 3vw, 72px);
 }
 
 .public-hero-decor-right {
-  right: clamp(-100px, -5vw, -42px);
+  right: clamp(24px, 3vw, 72px);
 }
 
 .public-section-hero > :not(.public-hero-decor) {
@@ -2047,4 +2047,52 @@ body:has(.public-site) .noise-overlay {
   .public-hero-decor {
     opacity: 0.12;
   }
+}
+
+
+/* Professional process connector and service icon */
+.public-process-grid {
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .public-process-grid .public-step-card {
+    overflow: visible;
+  }
+
+  .public-process-grid .public-step-card:not(:last-child)::after {
+    content: '→';
+    position: absolute;
+    top: 50%;
+    right: -1.45rem;
+    transform: translateY(-50%);
+    z-index: 2;
+    color: rgba(46, 107, 255, 0.42);
+    font-size: 1.35rem;
+    font-weight: 600;
+    line-height: 1;
+    pointer-events: none;
+  }
+}
+
+.public-service-insight-icon {
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.875rem;
+  color: var(--tb-blue-500);
+  background: rgba(46, 107, 255, 0.08);
+  border: 1px solid rgba(46, 107, 255, 0.18);
+}
+
+.public-service-insight-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

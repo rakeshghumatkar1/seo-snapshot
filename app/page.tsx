@@ -79,6 +79,41 @@ export default function Home() {
     <div>
       {/* Hero */}
       <section className="public-section-hero public-section-hero-compact flex flex-col items-center justify-center text-center px-6 py-20 lg:py-24 relative">
+        <div className="public-hero-decor public-hero-decor-left" aria-hidden="true">
+          <svg viewBox="0 0 300 360" fill="none">
+            <rect x="24" y="38" width="242" height="278" rx="18" />
+            <path d="M24 86h242" />
+            <circle cx="53" cy="62" r="5" />
+            <circle cx="72" cy="62" r="5" />
+            <circle cx="91" cy="62" r="5" />
+            <rect x="52" y="116" width="150" height="18" rx="9" />
+            <rect x="52" y="153" width="184" height="10" rx="5" />
+            <rect x="52" y="177" width="145" height="10" rx="5" />
+            <rect x="52" y="217" width="78" height="66" rx="10" />
+            <rect x="146" y="217" width="90" height="12" rx="6" />
+            <rect x="146" y="245" width="70" height="10" rx="5" />
+            <circle cx="230" cy="284" r="35" />
+            <path d="m255 309 25 25" />
+          </svg>
+        </div>
+
+        <div className="public-hero-decor public-hero-decor-right" aria-hidden="true">
+          <svg viewBox="0 0 300 360" fill="none">
+            <rect x="35" y="42" width="230" height="276" rx="18" />
+            <path d="M70 102h110M70 132h72" />
+            <path d="M72 254 118 208l38 29 70-88" />
+            <path d="m204 149 22 0 0 22" />
+            <circle cx="88" cy="282" r="12" />
+            <path d="m82 282 5 5 9-11" />
+            <circle cx="142" cy="282" r="12" />
+            <path d="m136 282 5 5 9-11" />
+            <circle cx="196" cy="282" r="12" />
+            <path d="m190 282 5 5 9-11" />
+            <circle cx="226" cy="94" r="35" />
+            <path d="m251 119 24 24" />
+          </svg>
+        </div>
+
         <p className="public-eyebrow public-eyebrow-hero fade-up delay-0">
           A THINK BIG DIGITAL SEO TOOL · FREE SNAPSHOT
         </p>

@@ -257,7 +257,7 @@ export default function Home() {
           <h2 className="public-heading-section">How It Works</h2>
         </div>
 
-        <div className="max-w-4xl mx-auto px-6 grid md:grid-cols-3 gap-5 lg:gap-6">
+        <div className="max-w-4xl mx-auto px-6 grid md:grid-cols-3 gap-5 lg:gap-6 public-process-grid">
           {[
             {
               num: '1',

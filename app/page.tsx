@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { sanitizeUrl } from '@/lib/url/sanitize'
 
 function isValidInput(url: string): boolean {
   const cleaned = url.trim()
@@ -11,8 +12,8 @@ function isValidInput(url: string): boolean {
     ? cleaned
     : 'https://' + cleaned
   try {
-    const u = new URL(withProtocol)
-    return u.hostname.includes('.')
+    sanitizeUrl(withProtocol)
+    return true
   } catch {
     return false
   }

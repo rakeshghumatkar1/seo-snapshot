@@ -23,7 +23,7 @@ export interface AIProviderOutput {
 export async function generateWithAI(
   input: AIProviderInput
 ): Promise<AIProviderOutput> {
-  const provider = process.env.AI_PROVIDER || 'openai'
+  const provider = process.env.AI_PROVIDER || 'mock'
 
   console.log('[AI] Using provider:', provider)
   console.log('[AI] API Key present:', !!process.env.OPENAI_API_KEY)
@@ -43,7 +43,7 @@ export async function generateWithAI(
       const maxTokens = input.reportType === 'detailed' ? 4000 : 3000
 
       const completion = await getOpenAI().chat.completions.create({
-        model: 'gpt-4-turbo',
+        model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
         messages: [
           {
             role: 'system',

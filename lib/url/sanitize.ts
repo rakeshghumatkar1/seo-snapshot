@@ -1,54 +1,40 @@
-export interface SanitizedUrl {
-  /** Full URL with protocol, e.g. "https://stripe.com" */
-  url: string
-  /** Hostname only, e.g. "stripe.com" */
-  hostname: string
-  /** Protocol, e.g. "https:" */
-  protocol: string
-}
+const BLOCKED_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^0\.0\.0\.0$/,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,          // AWS/GCP metadata
+  /^100\.64\./,           // Carrier-grade NAT
+  /^::1$/,                // IPv6 loopback
+  /^fc00:/i,              // IPv6 private
+  /^fe80:/i,              // IPv6 link-local
+]
 
-/**
- * Validates and sanitizes a user-provided URL.
- * Returns only the structured parts — never raw user input.
- * Throws if the URL is invalid or uses a non-http(s) protocol.
- */
-export function sanitizeUrl(raw: string): SanitizedUrl {
-  const trimmed = raw.trim().replace(/\/+$/, '')
-
-  if (!trimmed) {
-    throw new Error('URL is required')
-  }
-
-  // Add protocol if missing
-  const withProtocol = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`
-
+export function sanitizeUrl(rawUrl: string): { url: string } {
   let parsed: URL
   try {
-    parsed = new URL(withProtocol)
+    parsed = new URL(rawUrl.trim())
   } catch {
     throw new Error('Invalid URL format')
   }
 
-  // Only allow http and https
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
     throw new Error('Only http and https URLs are allowed')
   }
 
-  // Hostname must have at least one dot (no localhost, no IPs for LLM prompts)
-  if (!parsed.hostname.includes('.')) {
-    throw new Error('Invalid domain — must contain a valid hostname')
+  const hostname = parsed.hostname.toLowerCase()
+
+  if (!hostname.includes('.') && hostname !== 'localhost') {
+    throw new Error('Invalid hostname')
   }
 
-  // Block obvious injection patterns in the hostname
-  if (/[\n\r\t\\]/.test(parsed.hostname)) {
-    throw new Error('Invalid characters in hostname')
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(hostname)) {
+      throw new Error('URL points to a private or restricted address')
+    }
   }
 
-  return {
-    url: `${parsed.protocol}//${parsed.hostname}`,
-    hostname: parsed.hostname,
-    protocol: parsed.protocol,
-  }
+  return { url: parsed.toString() }
 }

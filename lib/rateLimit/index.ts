@@ -12,16 +12,6 @@ const MAX_REQUESTS = 20
 // In-memory store — fast, resets on redeploy
 const memoryStore = new Map<string, RateLimitEntry>()
 
-// Clean up old entries every hour
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, entry] of memoryStore.entries()) {
-    if (now > entry.resetAt) {
-      memoryStore.delete(key)
-    }
-  }
-}, 60 * 60 * 1000)
-
 export interface RateLimitResult {
   allowed: boolean
   remaining: number
@@ -51,8 +41,20 @@ export async function checkRateLimit(
   const now = Date.now()
   const key = `rate:${ip}`
 
+  // Try DB first for cross-instance consistency
+  const dbEntry = await getRateLimitFromDb(ip)
+  if (dbEntry) {
+    // Sync DB state into memory
+    memoryStore.set(key, dbEntry)
+  }
+
   // Try memory store first
   let entry = memoryStore.get(key)
+
+  if (entry && Date.now() > entry.resetAt) {
+    memoryStore.delete(key)
+    entry = undefined
+  }
 
   if (!entry || now > entry.resetAt) {
     // No entry or expired — create fresh
@@ -65,7 +67,7 @@ export async function checkRateLimit(
 
     // Also sync to DB asynchronously
     syncToDb(ip, entry).catch(err =>
-      console.error('[RateLimit] DB sync failed:', err)
+      console.error('[RateLimit] DB sync failed:', err?.message)
     )
 
     return {
@@ -94,7 +96,7 @@ export async function checkRateLimit(
 
   // Sync to DB asynchronously
   syncToDb(ip, entry).catch(err =>
-    console.error('[RateLimit] DB sync failed:', err)
+    console.error('[RateLimit] DB sync failed:', err?.message)
   )
 
   return {

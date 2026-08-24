@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateDetailedReport } from '@/lib/ai/generateDetailedReport';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/rateLimit/getIp';
-import { insertReport } from '@/lib/db/schema';
+import { insertReport, getConfig } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,31 +34,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { websiteUrl, email, name, company } = body;
 
-    if (!websiteUrl || typeof websiteUrl !== 'string' || !email) {
+    if (!websiteUrl || typeof websiteUrl !== 'string') {
       return NextResponse.json(
-        { error: 'Website URL and email are required' },
+        { error: 'Website URL is required' },
         { status: 400 }
-      );
+      )
+    }
+
+    const config = await getConfig()
+    if (config.requireEmailForDetailed && !email?.trim()) {
+      return NextResponse.json(
+        { error: 'Email is required' },
+        { status: 400 }
+      )
     }
 
     const cleanUrl = websiteUrl.trim().replace(/\/+$/, '');
-
-    // Store lead BEFORE generating report
-    try {
-      await fetch(new URL('/api/leads', request.url).toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          name: name || null,
-          company: company || null,
-          websiteUrl: cleanUrl,
-          actionType: 'detailed',
-        }),
-      });
-    } catch (leadErr) {
-      console.error('Lead storage failed (non-critical):', leadErr);
-    }
 
     const result = await generateDetailedReport(cleanUrl);
 

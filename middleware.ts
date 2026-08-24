@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifySessionToken } from '@/lib/admin/auth'
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -11,7 +12,7 @@ export function middleware(req: NextRequest) {
   ) {
     const session = req.cookies.get('admin_session')
 
-    if (!session) {
+    if (!session?.value || !verifySessionToken(session.value)) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(
           { error: 'Unauthorized' },

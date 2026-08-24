@@ -1,3 +1,5 @@
+import { sanitizeUrl } from '@/lib/url/sanitize'
+
 export interface PageContent {
   url: string
   title: string
@@ -219,26 +221,28 @@ function extractInternalLinks(
 export async function fetchWebsiteContent(
   websiteUrl: string
 ): Promise<WebsiteContent> {
-  const domain = websiteUrl
+  const { url } = sanitizeUrl(websiteUrl)
+
+  const domain = url
     .replace(/https?:\/\//, '')
     .replace(/\/$/, '')
     .split('/')[0]
 
-  console.log('[Fetcher] Starting:', websiteUrl)
+  console.log('[Fetcher] Starting:', url)
 
   // Step 1: Fetch homepage
   const homepage = await fetchSinglePage(
-    websiteUrl
+    url
   )
 
   if (!homepage) {
     console.warn(
-      '[Fetcher] Homepage failed:', websiteUrl
+      '[Fetcher] Homepage failed:', url
     )
     return {
       domain,
       homepage: {
-        url: websiteUrl,
+        url: url,
         title: '',
         headings: [],
         navLinks: [],
@@ -259,7 +263,7 @@ export async function fetchWebsiteContent(
   try {
     const controller = new AbortController()
     setTimeout(() => controller.abort(), 5000)
-    const res = await fetch(websiteUrl, {
+    const res = await fetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0',
@@ -272,7 +276,7 @@ export async function fetchWebsiteContent(
   }
 
   const internalLinks = homepageHtml
-    ? extractInternalLinks(homepageHtml, websiteUrl)
+    ? extractInternalLinks(homepageHtml, url)
     : []
 
   console.log(

@@ -13,7 +13,7 @@ export async function dbQuery(
   params: any[] = []
 ): Promise<any[]> {
   if (!sql) {
-    console.warn('[DB] No database configured')
+    console.warn('[DB] DATABASE_URL is not configured — skipping query')
     return []
   }
   try {
@@ -21,6 +21,6 @@ export async function dbQuery(
     return result as any[]
   } catch (err: any) {
     console.error('[DB Error]', err?.message)
-    return []
+    throw err
   }
 }

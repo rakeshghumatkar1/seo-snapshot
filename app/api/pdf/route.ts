@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { insertLead } from '@/lib/db/schema'
+import { getConfig } from '@/lib/db/schema'
 import { buildPDFHTML } from '@/lib/pdf/generatePDF'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { email, name, company, websiteUrl, sections, reportType } = body
-
-    if (!email?.trim()) {
-      return NextResponse.json(
-        { error: 'Email is required.' },
-        { status: 400 }
-      )
-    }
 
     if (!websiteUrl || !sections) {
       return NextResponse.json(
@@ -21,16 +14,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Store lead first — never lose it
-    await insertLead({
-      email,
-      name,
-      company,
-      websiteUrl,
-      requestedReportType: 'pdf',
-    }).catch(err =>
-      console.error('[PDF] Lead storage failed', err)
-    )
+    const config = await getConfig()
+    if (config.requireEmailForPDF && !email?.trim()) {
+      return NextResponse.json(
+        { error: 'Email is required' },
+        { status: 400 }
+      )
+    }
 
     // Build PDF HTML
     const html = buildPDFHTML({
@@ -38,6 +28,13 @@ export async function POST(req: NextRequest) {
       reportType: reportType || 'snapshot',
       sections,
     })
+
+    if (!html?.trim()) {
+      return NextResponse.json(
+        { error: 'Failed to generate PDF content' },
+        { status: 500 }
+      )
+    }
 
     const filename = `seo-report-${websiteUrl
       .replace(/https?:\/\//, '')

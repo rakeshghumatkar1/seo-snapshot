@@ -13,13 +13,27 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await insertLead({
+    if (!websiteUrl?.trim()) {
+      return NextResponse.json(
+        { error: 'websiteUrl is required' },
+        { status: 400 }
+      )
+    }
+
+    const result = await insertLead({
       email,
       name,
       company,
       websiteUrl,
       requestedReportType: actionType || 'detailed',
     })
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Failed to save lead' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({ success: true })
   } catch (err) {

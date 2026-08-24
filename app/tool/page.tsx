@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LoadingState from '@/components/ui/LoadingState';
+import { sanitizeUrl } from '@/lib/url/sanitize'
 
 export default function ToolPage() {
   return (
@@ -23,8 +24,8 @@ function isValidInput(url: string): boolean {
     ? cleaned
     : 'https://' + cleaned
   try {
-    const u = new URL(withProtocol)
-    return u.hostname.includes('.')
+    sanitizeUrl(withProtocol)
+    return true
   } catch {
     return false
   }
@@ -85,6 +86,7 @@ function ToolContent() {
       console.log('Sections:', data.sections);
 
       sessionStorage.setItem('reportData', JSON.stringify(data));
+      setIsLoading(false);
       router.push('/report');
     } catch (err: any) {
       console.error('Error generating report:', err);

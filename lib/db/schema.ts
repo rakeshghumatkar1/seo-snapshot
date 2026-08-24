@@ -1,4 +1,5 @@
 import { dbQuery } from './client'
+import { defaultFeatureConfig } from '@/lib/config'
 
 export async function setupDatabase() {
   try {
@@ -117,9 +118,10 @@ export async function insertLead({
   requestedReportType: string
 }) {
   try {
-    await dbQuery(
+    const rows = await dbQuery(
       `INSERT INTO leads (email, name, company, website_url, requested_report_type)
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
       [
         email.toLowerCase().trim(),
         name?.trim() || null,
@@ -128,11 +130,14 @@ export async function insertLead({
         requestedReportType,
       ]
     )
+    if (!rows.length) {
+      return { success: false, error: 'Insert returned no rows' }
+    }
     console.log('[DB] Lead saved:', email)
     return { success: true }
   } catch (err: any) {
-    console.error('[DB] Lead insert failed:', err?.message)
-    return { success: false }
+    console.error('[DB] insertLead failed:', err?.message)
+    return { success: false, error: err?.message || 'Unknown error' }
   }
 }
 
@@ -148,9 +153,10 @@ export async function insertRating({
   comment?: string
 }) {
   try {
-    await dbQuery(
+    const rows = await dbQuery(
       `INSERT INTO ratings (website_url, email, rating, comment)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
       [
         websiteUrl,
         email?.toLowerCase().trim() || null,
@@ -158,11 +164,14 @@ export async function insertRating({
         comment?.trim() || null,
       ]
     )
+    if (!rows.length) {
+      return { success: false, error: 'Insert returned no rows' }
+    }
     console.log('[DB] Rating saved:', rating)
     return { success: true }
   } catch (err: any) {
-    console.error('[DB] Rating insert failed:', err?.message)
-    return { success: false }
+    console.error('[DB] insertRating failed:', err?.message)
+    return { success: false, error: err?.message || 'Unknown error' }
   }
 }
 
@@ -180,10 +189,11 @@ export async function insertReport({
   sectionsJson?: object
 }) {
   try {
-    await dbQuery(
+    const rows = await dbQuery(
       `INSERT INTO reports 
        (website_url, report_type, email, status, sections_json)
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
       [
         websiteUrl,
         reportType,
@@ -192,22 +202,19 @@ export async function insertReport({
         sectionsJson ? JSON.stringify(sectionsJson) : null,
       ]
     )
+    if (!rows.length) {
+      return { success: false, error: 'Insert returned no rows' }
+    }
     console.log('[DB] Report logged:', reportType, websiteUrl)
     return { success: true }
   } catch (err: any) {
-    console.error('[DB] Report insert failed:', err?.message)
-    return { success: false }
+    console.error('[DB] insertReport failed:', err?.message)
+    return { success: false, error: err?.message || 'Unknown error' }
   }
 }
 
 export async function getConfig(): Promise<Record<string, boolean>> {
-  const defaults: Record<string, boolean> = {
-    enableDetailedReport: true,
-    enablePDFDownload: true,
-    enableRating: true,
-    requireEmailForDetailed: true,
-    requireEmailForPDF: true,
-  }
+  const defaults: Record<string, boolean> = { ...defaultFeatureConfig }
 
   try {
     const rows = await dbQuery(`SELECT key, value FROM config`)
@@ -215,7 +222,7 @@ export async function getConfig(): Promise<Record<string, boolean>> {
 
     const config: Record<string, boolean> = {}
     for (const row of rows) {
-      config[row.key] = row.value === 'true'
+      config[row.key] = ['true', '1', 'yes'].includes(row.value.toLowerCase())
     }
     return { ...defaults, ...config }
   } catch (err) {

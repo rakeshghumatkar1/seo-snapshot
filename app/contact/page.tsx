@@ -46,6 +46,9 @@ export default function ContactPage() {
 
       <Card>
         <h2 className="text-xl font-bold text-white mb-6 section-accent">Send Us a Message</h2>
+        <div className="text-sm text-yellow-600 bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+          Contact form coming soon. For now, reach us at hello@seosnapshot.com
+        </div>
         <form className="space-y-5">
           <div>
             <label htmlFor="contact-name" className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">

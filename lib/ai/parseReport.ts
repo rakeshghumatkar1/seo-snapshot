@@ -22,7 +22,7 @@ function parseAllSections(
     const contentStart = keyIndex + keyWithColon.length
 
     const nextKeyIndex = nextKey
-      ? text.indexOf(nextKey + ':')
+      ? text.indexOf(nextKey + ':', contentStart)
       : -1
 
     const contentEnd =
@@ -83,10 +83,7 @@ export function parseSnapshotReport(
       .some(v => v.length > 30)
 
     if (!hasContent) {
-      console.error(
-        '[Parser] No content extracted. Full text:',
-        aiText.substring(0, 500)
-      )
+      console.error('[Parser] Failed — no valid sections extracted. Preview:', aiText?.substring(0, 300))
       return null
     }
 
@@ -149,9 +146,7 @@ export function parseDetailedReport(
       .some(v => v.length > 30)
 
     if (!hasContent) {
-      console.error(
-        '[Parser] No detailed content extracted.'
-      )
+      console.error('[Parser] Failed — no valid sections extracted. Preview:', aiText?.substring(0, 300))
       return null
     }
 

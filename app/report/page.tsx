@@ -77,6 +77,15 @@ function ReportContent() {
     if (stored) {
       try {
         const parsedData = JSON.parse(stored);
+        if (
+          !parsedData?.type ||
+          !parsedData?.websiteUrl ||
+          !parsedData?.sections
+        ) {
+          console.error('[Report] Invalid report shape in sessionStorage');
+          router.push('/tool');
+          return;
+        }
         setReport(parsedData);
         setChecked(true);
         return;
@@ -90,6 +99,15 @@ function ReportContent() {
     if (dataParam) {
       try {
         const parsedData = JSON.parse(decodeURIComponent(dataParam));
+        if (
+          !parsedData?.type ||
+          !parsedData?.websiteUrl ||
+          !parsedData?.sections
+        ) {
+          console.error('[Report] Invalid report shape in ?data= param')
+          router.push('/tool')
+          return
+        }
         setReport(parsedData);
         setChecked(true);
         return;
@@ -183,10 +201,17 @@ function ReportContent() {
         }),
       });
 
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setModalError(data.error || 'PDF generation failed. Please try again.');
+        return;
+      }
+
       const data = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || 'PDF generation failed');
+        setModalError('PDF generation failed. Please try again.');
+        return;
       }
 
       // Open print dialog — works on all browsers
@@ -228,7 +253,7 @@ function ReportContent() {
     setModalError(null);
 
     try {
-      await fetch('/api/leads', {
+      const leadsRes = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -239,6 +264,11 @@ function ReportContent() {
           actionType: modalAction,
         }),
       });
+      if (!leadsRes.ok) {
+        const err = await leadsRes.json().catch(() => ({}));
+        setModalError(err.error || 'Failed to save your information. Please try again.');
+        return;
+      }
 
       const submittedEmail = email.trim();
       const submittedName = name.trim();
@@ -288,9 +318,13 @@ function ReportContent() {
         const detailedData = await response.json();
         sessionStorage.setItem('reportData', JSON.stringify(detailedData));
         setReport(detailedData);
+      } else {
+        const err = await response.json().catch(() => ({}));
+        setModalError(err.error || 'Failed to generate detailed report. Please try again.');
       }
     } catch (error) {
       console.error('Error generating detailed report:', error);
+      setModalError('Something went wrong. Please try again.');
     } finally {
       setGeneratingDetailed(false);
     }
@@ -315,6 +349,12 @@ function ReportContent() {
     <div className="max-w-3xl mx-auto px-6 py-16">
       {/* Report Header */}
       <ReportHeader websiteUrl={report.websiteUrl} reportType={report.type} />
+
+      {modalError && (
+        <p className="text-center mb-6" style={{ color: '#ef4444', fontSize: '14px' }}>
+          {modalError}
+        </p>
+      )}
 
       {/* Section Cards */}
       {Object.entries(report.sections).map(([key, value], index) => {

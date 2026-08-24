@@ -166,15 +166,22 @@ export default function AdminDashboard() {
   // Load prompts
   useEffect(() => {
     fetch('/api/admin/prompts')
-      .then(r => r.json())
+      .then(r => {
+        if (r.status === 401) {
+          router.push('/admin')
+          return null
+        }
+        return r.json()
+      })
       .then(data => {
+        if (!data) return
         if (data.snapshot !== undefined) setSnapshotPrompt(data.snapshot)
         if (data.detailed !== undefined) setDetailedPrompt(data.detailed)
         if (data.snapshotUpdatedAt) setSnapshotUpdatedAt(data.snapshotUpdatedAt)
         if (data.detailedUpdatedAt) setDetailedUpdatedAt(data.detailedUpdatedAt)
       })
       .catch(() => {})
-  }, [])
+  }, [router])
 
   // Load table when section or page changes
   const loadTable = useCallback(async (table: TableName, p: number) => {
@@ -215,6 +222,10 @@ export default function AdminDashboard() {
     setExportLoading(`csv-${table}`)
     try {
       const res = await fetch(`/api/admin/export?table=${table}&format=csv`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Export failed')
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -222,8 +233,9 @@ export default function AdminDashboard() {
       a.download = `${table}_${new Date().toISOString().split('T')[0]}.csv`
       a.click()
       URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('CSV export failed:', err)
+    } catch (err: any) {
+      console.error('[Export] Failed:', err?.message)
+      alert(err?.message || 'Export failed')
     } finally {
       setExportLoading(null)
     }
@@ -301,11 +313,15 @@ export default function AdminDashboard() {
     else setDetailedPrompt('')
     setPromptSaving(true)
     try {
-      await fetch('/api/admin/prompts', {
+      const res = await fetch('/api/admin/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, content: '' }),
       })
+      if (!res.ok) {
+        setPromptMessage({ type: 'error', text: 'Failed to clear prompt. Try again.' })
+        return
+      }
       setPromptMessage({ type: 'success', text: 'Cleared — using fallback' })
       const now = new Date().toISOString()
       if (activePromptTab === 'snapshot') setSnapshotUpdatedAt(now)
@@ -553,7 +569,11 @@ export default function AdminDashboard() {
             </h1>
 
             {/* Stat cards */}
-            {stats && (
+            {!stats ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280' }}>
+                Loading stats...
+              </div>
+            ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' }}>
                 {[
                   { label: 'Total Leads', value: stats.leads.total, sub: `${stats.leads.pdfCount} PDF · ${stats.leads.detailedCount} Detailed`, color: '#10b981' },

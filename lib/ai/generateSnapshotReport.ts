@@ -16,7 +16,7 @@ async function getSystemPrompt(key: string, fallback: string): Promise<string> {
     )
     const dbPrompt = rows.length > 0 ? rows[0].content : null
     console.log('[Prompt] DB value:', dbPrompt?.substring(0, 50))
-    if (dbPrompt) {
+    if (dbPrompt?.trim()) {
       console.log('[Prompt] Source: DB')
       return dbPrompt
     }

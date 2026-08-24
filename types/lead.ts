@@ -3,5 +3,5 @@ export interface LeadPayload {
   name?: string
   company?: string
   websiteUrl: string
-  actionType: 'pdf' | 'detailed' | 'snapshot_view'
+  actionType: 'pdf' | 'detailed'
 }

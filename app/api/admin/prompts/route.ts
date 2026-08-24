@@ -111,11 +111,20 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await dbQuery(
-      `UPDATE prompts SET content = $1, updated_at = NOW() WHERE key = $2`,
-      [content, key]
+    const rows = await dbQuery(
+      `INSERT INTO prompts (key, content, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE
+       SET content = EXCLUDED.content, updated_at = NOW()
+       RETURNING id`,
+      [key, content]
     )
-
+    if (!rows.length) {
+      return NextResponse.json(
+        { error: 'Failed to save prompt' },
+        { status: 500 }
+      )
+    }
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('[Admin/prompts POST]', err)

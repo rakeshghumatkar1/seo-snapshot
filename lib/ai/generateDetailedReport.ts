@@ -14,8 +14,9 @@ async function getSystemPrompt(key: string, fallback: string): Promise<string> {
       `SELECT content FROM prompts WHERE key = $1`,
       [key]
     )
-    if (rows.length > 0 && rows[0].content) {
-      return rows[0].content
+    const dbPrompt = rows.length > 0 ? rows[0].content : null
+    if (dbPrompt?.trim()) {
+      return dbPrompt
     }
   } catch {
     // fall through to default

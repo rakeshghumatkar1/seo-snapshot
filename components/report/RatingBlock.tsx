@@ -13,6 +13,7 @@ export default function RatingBlock({ websiteUrl, email }: RatingBlockProps) {
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (rating === 0) return;
@@ -33,9 +34,13 @@ export default function RatingBlock({ websiteUrl, email }: RatingBlockProps) {
 
       if (response.ok) {
         setSubmitted(true);
+      } else {
+        const err = await response.json().catch(() => ({}));
+        setError(err.error || 'Failed to submit rating. Please try again.');
       }
     } catch (error) {
       console.error('Failed to submit rating:', error);
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -114,6 +119,9 @@ export default function RatingBlock({ websiteUrl, email }: RatingBlockProps) {
       >
         {isSubmitting ? 'Submitting\u2026' : 'Submit Feedback'}
       </button>
+      {error && (
+        <p className="text-red-500 text-sm mt-2">{error}</p>
+      )}
     </div>
   );
 }

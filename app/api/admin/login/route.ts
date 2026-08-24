@@ -24,7 +24,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const token = generateSessionToken()
+    let token: string
+    try {
+      token = generateSessionToken()
+    } catch (err: any) {
+      console.error('[Auth] Token generation failed:', err?.message)
+      return NextResponse.json(
+        { error: 'Server misconfiguration — admin access unavailable' },
+        { status: 500 }
+      )
+    }
 
     const response = NextResponse.json({ success: true })
 
@@ -32,7 +41,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60,
+      maxAge: 2 * 60 * 60,
       path: '/',
     })
 

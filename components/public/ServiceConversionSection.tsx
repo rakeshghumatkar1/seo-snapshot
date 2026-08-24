@@ -10,6 +10,13 @@ export default function ServiceConversionSection() {
   return (
     <section className="public-section-service" aria-labelledby="service-conversion-heading">
       <div className="max-w-3xl mx-auto px-6 py-16 lg:py-20 text-center">
+        <div className="public-service-insight-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none">
+            <path d="M7 23.5 13 17l4 3 8-10" />
+            <path d="M20 10h5v5" />
+            <path d="M7 8.5h7M7 12h4" />
+          </svg>
+        </div>
         <p className="public-eyebrow public-eyebrow-on-light mb-4">
           NEED HELP IMPLEMENTING THE FINDINGS?
         </p>

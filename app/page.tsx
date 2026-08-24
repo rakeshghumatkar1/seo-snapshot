@@ -101,7 +101,7 @@ export default function Home() {
           <label htmlFor="homepage-url" className="public-form-label">
             Website URL
           </label>
-          <div className="flex gap-2.5 flex-col xs:flex-row">
+          <div className="flex gap-2.5 flex-col sm:flex-row">
             <input
               id="homepage-url"
               type="url"
@@ -109,10 +109,10 @@ export default function Home() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="yourdomain.com"
-              className="input input-hero flex-1"
+              className="input input-hero w-full min-w-0 sm:flex-1"
               autoComplete="url"
             />
-            <button type="submit" className="btn btn-primary btn-lg whitespace-nowrap">
+            <button type="submit" className="btn btn-primary btn-lg w-full sm:w-auto whitespace-nowrap">
               Generate Free Snapshot
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path

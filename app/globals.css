@@ -1999,3 +1999,52 @@ body:has(.public-site) .noise-overlay {
   white-space: nowrap;
   border-width: 0;
 }
+
+
+/* Desktop-only decorative SEO line art in the homepage hero */
+.public-hero-decor {
+  display: none;
+  position: absolute;
+  top: 50%;
+  width: clamp(180px, 18vw, 300px);
+  transform: translateY(-48%);
+  color: var(--tb-cyan-400);
+  opacity: 0.1;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.public-hero-decor svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.public-hero-decor-left {
+  left: clamp(-100px, -5vw, -42px);
+}
+
+.public-hero-decor-right {
+  right: clamp(-100px, -5vw, -42px);
+}
+
+.public-section-hero > :not(.public-hero-decor) {
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 1280px) {
+  .public-hero-decor {
+    display: block;
+  }
+}
+
+@media (min-width: 1536px) {
+  .public-hero-decor {
+    opacity: 0.12;
+  }
+}

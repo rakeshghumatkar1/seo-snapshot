@@ -169,9 +169,9 @@ function ToolContent() {
   }
 
   return (
-    <div className="flex items-start justify-center px-6" style={{ marginTop: '12vh' }}>
+    <div className="public-page-content flex items-start justify-center px-6" style={{ paddingTop: '12vh', paddingBottom: '4rem' }}>
       <div className="w-full max-w-lg">
-        <div className="glass-elevated p-10 fade-up">
+        <div className="public-card p-10 fade-up">
           {/* Badge */}
           <div className="badge badge-emerald mb-5">ENTER YOUR WEBSITE</div>
 
@@ -187,7 +187,7 @@ function ToolContent() {
               marginBottom: '8px',
             }}
           >
-            Analyze Your SEO
+            Generate Your Snapshot
           </h1>
 
           {/* Sub */}
@@ -200,7 +200,8 @@ function ToolContent() {
               marginBottom: '28px',
             }}
           >
-            Enter your website URL to receive an instant AI-powered SEO analysis. No signup required.
+            Enter your website URL for a free, business-friendly review of visible pages. No signup
+            required for the Snapshot.
           </p>
 
           {/* Form */}
@@ -224,8 +225,8 @@ function ToolContent() {
 
           {/* Trust pills */}
           <div className="flex gap-2 mt-5 justify-center flex-wrap">
-            {['✓ Free forever', '✓ No signup', '✓ 30 seconds'].map((t) => (
-              <span key={t} className="badge badge-glass">{t}</span>
+            {['Free Snapshot', 'No signup required', 'Business-first guidance'].map((t) => (
+              <span key={t} className="public-trust-pill public-trust-pill-light">{t}</span>
             ))}
           </div>
         </div>

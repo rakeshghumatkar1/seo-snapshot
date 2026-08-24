@@ -1,26 +1,41 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import Providers from "@/components/providers/Providers";
 import PublicShell from "@/components/layout/PublicShell";
+import { CANONICAL_ORIGIN } from "@/lib/brand/links";
+import { FAVICON_SYMBOL_SRC } from "@/lib/brand/assets";
 
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-display",
+const geistSans = localFont({
+  src: [
+    { path: "../public/fonts/geist-sans-Geist-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/geist-sans-Geist-Medium.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/geist-sans-Geist-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "../public/fonts/geist-sans-Geist-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-geist-sans",
   display: "swap",
 });
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-body",
+const geistMono = localFont({
+  src: [
+    { path: "../public/fonts/geist-mono-GeistMono-Regular.woff2", weight: "400", style: "normal" },
+  ],
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "SEO Snapshot - AI-Powered SEO Advisory Reports",
-  description: "Get instant AI-powered SEO insights for your website. Free snapshot reports and detailed analysis for business owners.",
+  title: "SEO & Business Visibility Snapshot | Think Big Digital",
+  description:
+    "Get a free, business-friendly review of your website's visible SEO, content and trust opportunities from Think Big Digital.",
+  metadataBase: new URL(CANONICAL_ORIGIN),
+  alternates: {
+    canonical: CANONICAL_ORIGIN,
+  },
+  icons: {
+    icon: FAVICON_SYMBOL_SRC,
+  },
 };
 
 export default function RootLayout({
@@ -29,8 +44,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${inter.variable}`} suppressHydrationWarning>
-      <body className="antialiased" style={{ fontFamily: 'var(--font-body), ui-sans-serif, system-ui, sans-serif' }}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <body className="antialiased" style={{ fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif' }}>
         <Providers>
           <a href="#main-content" className="skip-link">
             Skip to main content

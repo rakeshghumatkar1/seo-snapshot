@@ -8,6 +8,7 @@ import ReportHeader from '@/components/report/ReportHeader';
 import ReportSection from '@/components/report/ReportSection';
 import RatingBlock from '@/components/report/RatingBlock';
 import CTABlock from '@/components/report/CTABlock';
+import ServiceHelpCTA from '@/components/public/ServiceHelpCTA';
 import Modal from '@/components/ui/Modal';
 
 const SNAPSHOT_SECTION_LABELS: Record<string, { category: string; title: string }> = {
@@ -346,7 +347,7 @@ function ReportContent() {
     : SNAPSHOT_SECTION_LABELS;
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="public-page-content max-w-3xl mx-auto px-6 py-16">
       {/* Report Header */}
       <ReportHeader websiteUrl={report.websiteUrl} reportType={report.type} />
 
@@ -376,7 +377,7 @@ function ReportContent() {
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
           {report.type === 'snapshot' && config?.enableDetailedReport && (
             <button onClick={handleGenerateDetailed} className="btn btn-primary btn-lg pulse w-full sm:w-auto justify-center">
-              Generate Detailed Report →
+              Get My Free Detailed Report →
             </button>
           )}
           {report.type === 'detailed' && config?.enablePDFDownload && (
@@ -395,12 +396,17 @@ function ReportContent() {
         </div>
       </div>
       {report.type === 'snapshot' && (
-        <p className="text-center mb-8" style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-400)' }}>
-          Detailed report requires email · Typically 45 seconds
+        <p className="text-center mb-4" style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-400)' }}>
+          Detailed report requires email
         </p>
       )}
+
+      {report.type === 'snapshot' && (
+        <ServiceHelpCTA variant="compact" />
+      )}
+
       {report.type === 'detailed' && (
-        <div className="mb-8" />
+        <ServiceHelpCTA variant="full" />
       )}
 
       {/* Rating Block */}
@@ -408,7 +414,7 @@ function ReportContent() {
         <RatingBlock websiteUrl={report.websiteUrl} email={capturedEmail || email} />
       )}
 
-      {/* CTA Block */}
+      {/* CTA Block — analyze another site */}
       <CTABlock />
 
       {/* Detailed Report Loading Overlay */}

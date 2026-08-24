@@ -4,180 +4,95 @@ export default function HowItWorksPage() {
   const steps = [
     {
       num: '01',
-      title: 'Enter Your Website URL',
-      body: 'Type in your domain and hit analyze. No account needed, no credit card required.',
+      title: 'Enter Your Website',
+      body: 'Paste your website URL. The Snapshot does not require registration or a credit card.',
     },
     {
       num: '02',
-      title: 'AI Analyzes Your SEO',
-      body: 'Our AI reviews your site structure, content signals, and visibility factors in real time.',
+      title: 'AI Reviews Visible Pages',
+      body: 'The tool reviews selected publicly visible pages for messaging, content usefulness, visible structure and trust signals. It does not perform a complete technical crawl.',
     },
     {
       num: '03',
-      title: 'Get Strategic Insights',
-      body: 'Receive a clear, business-friendly report with actionable recommendations — not technical noise.',
+      title: 'Receive Clear Direction',
+      body: 'Get a business-friendly report explaining visible strengths, opportunities and the priorities worth considering first.',
     },
   ];
 
-  const stats = [
-    { value: '30 sec', label: 'Average report time' },
-    { value: '100% Free', label: 'For Snapshot reports' },
-    { value: 'No Signup', label: 'Required for Snapshot' },
+  const highlights = [
+    { value: 'Free Snapshot', label: 'Visible without registration' },
+    { value: 'Business-first', label: 'Plain-language guidance' },
+    { value: 'Email for Detailed', label: 'Deeper report when ready' },
   ];
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-16">
-      {/* ═══ HERO ═══ */}
+    <div className="public-page-content max-w-5xl mx-auto px-6 py-16">
       <div className="text-center mb-20">
-        <div className="badge badge-emerald mx-auto mb-4 fade-up">HOW IT WORKS</div>
-        <h1
-          className="fade-up delay-1"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'var(--text-h1)',
-            fontWeight: 700,
-            letterSpacing: '-0.03em',
-            lineHeight: 1.05,
-            color: 'var(--t-100)',
-            marginBottom: '16px',
-          }}
-        >
+        <p className="public-eyebrow mb-4" style={{ color: '#2E6BFF' }}>
+          HOW IT WORKS
+        </p>
+        <h1 className="public-heading-section mb-4">
           Three Steps to{' '}
-          <span className="gradient-text">Strategic Clarity</span>
+          <span className="public-accent-gradient">Clearer Website Direction</span>
         </h1>
-        <p
-          className="fade-up delay-2"
-          style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: '18px',
-            color: 'var(--t-200)',
-            lineHeight: 1.75,
-            maxWidth: '520px',
-            margin: '0 auto',
-          }}
-        >
-          Get professional SEO insights in three simple steps. No technical expertise required.
+        <p className="public-body-lg" style={{ maxWidth: '520px', margin: '0 auto' }}>
+          Get business-friendly SEO insights in three simple steps. No technical expertise required.
         </p>
       </div>
 
-      {/* ═══ STEPS ═══ */}
       <div className="grid md:grid-cols-3 gap-6 mb-20">
-        {steps.map((step, i) => (
-          <div
-            key={step.num}
-            className={`glass p-8 relative fade-up delay-${i + 3}`}
-          >
-            {/* Large background number */}
+        {steps.map((step) => (
+          <div key={step.num} className="public-card relative">
             <span
               aria-hidden="true"
               style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '80px',
+                fontSize: '4rem',
                 fontWeight: 800,
-                color: 'var(--em-500)',
-                opacity: 0.15,
+                color: 'rgba(46, 107, 255, 0.12)',
                 position: 'absolute',
                 top: '10px',
                 right: '18px',
                 lineHeight: 1,
-                pointerEvents: 'none',
-                userSelect: 'none',
               }}
             >
               {step.num}
             </span>
-
-            {/* Content */}
             <div className="relative z-10">
-              <div className="badge badge-emerald mb-4">
+              <p className="public-eyebrow mb-3" style={{ color: '#2E6BFF', fontSize: '10px' }}>
                 STEP {step.num}
-              </div>
-              <h2
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: 'var(--t-100)',
-                  letterSpacing: '-0.01em',
-                  lineHeight: 1.3,
-                  marginBottom: '10px',
-                }}
-              >
+              </p>
+              <h2 className="public-heading-card" style={{ fontSize: '1.25rem', marginBottom: '10px' }}>
                 {step.title}
               </h2>
-              <p
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  fontSize: '16px',
-                  color: 'var(--t-200)',
-                  lineHeight: 1.8,
-                }}
-              >
-                {step.body}
-              </p>
+              <p className="public-body-md">{step.body}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ═══ STAT HIGHLIGHTS ═══ */}
       <div className="grid md:grid-cols-3 gap-6 mb-20">
-        {stats.map((stat, i) => (
-          <div
-            key={stat.value}
-            className={`glass p-6 text-center fade-up delay-${i + 5}`}
-          >
+        {highlights.map((stat) => (
+          <div key={stat.value} className="public-card p-6 text-center">
             <p
               style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '28px',
+                fontSize: '1.25rem',
                 fontWeight: 700,
-                letterSpacing: '-0.02em',
-                color: 'var(--em-400)',
+                color: '#2E6BFF',
                 marginBottom: '4px',
               }}
             >
               {stat.value}
             </p>
-            <p
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: '14px',
-                color: 'var(--t-300)',
-              }}
-            >
-              {stat.label}
-            </p>
+            <p className="public-body-sm">{stat.label}</p>
           </div>
         ))}
       </div>
 
-      {/* ═══ BOTTOM CTA ═══ */}
-      <div className="glass-elevated p-12 text-center relative max-w-2xl mx-auto">
-        <div className="accent-line-top" />
-        <h2
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'var(--text-h2)',
-            fontWeight: 700,
-            letterSpacing: '-0.02em',
-            lineHeight: 1.1,
-            color: 'var(--t-100)',
-            marginBottom: '12px',
-          }}
-        >
+      <div className="public-card p-12 text-center max-w-2xl mx-auto">
+        <h2 className="public-heading-section" style={{ fontSize: '1.5rem', marginBottom: '12px' }}>
           See It For Yourself
         </h2>
-        <p
-          style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: '16px',
-            color: 'var(--t-200)',
-            marginBottom: '28px',
-          }}
-        >
-          Try the tool free — no account needed
-        </p>
+        <p className="public-body-md mb-7">Try the tool free—no account needed for the Snapshot.</p>
         <Link href="/tool" className="btn btn-primary btn-lg">
           Generate Free Snapshot
         </Link>

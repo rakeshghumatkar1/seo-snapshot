@@ -13,12 +13,12 @@ export default function PublicShell({ children }: { children: React.ReactNode })
   }
 
   return (
-    <>
+    <div className="public-site flex flex-col min-h-screen">
       <Header />
-      <main id="main-content" className="min-h-screen">
+      <main id="main-content" className="flex-1">
         {children}
       </main>
       <Footer />
-    </>
+    </div>
   )
 }

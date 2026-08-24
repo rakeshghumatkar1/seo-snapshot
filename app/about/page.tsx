@@ -2,68 +2,110 @@ import Link from 'next/link';
 
 export default function AboutPage() {
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
-      <div className="badge badge-emerald mb-4 fade-up">ABOUT US</div>
-      <h1
-        className="fade-up delay-1"
-        style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h1)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, color: 'var(--t-100)', marginBottom: '16px' }}
-      >
-        About <span className="gradient-text">SEO AI</span>
+    <div className="public-page-content max-w-3xl mx-auto px-6 py-16">
+      <p className="public-eyebrow mb-4" style={{ color: '#2E6BFF' }}>
+        ABOUT
+      </p>
+      <h1 className="public-heading-section mb-4">
+        About SEO &amp; Business Visibility Snapshot
       </h1>
-      <p className="fade-up delay-2" style={{ fontFamily: 'var(--font-body)', fontSize: '18px', color: 'var(--t-200)', lineHeight: 1.75, marginBottom: '40px' }}>
-        We believe SEO guidance should be accessible, actionable, and business-focused — not buried in technical jargon.
+      <p className="public-body-lg mb-10">
+        A business-friendly SEO visibility tool from{' '}
+        <a
+          href="https://thinkbigdigital.co"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="public-link"
+        >
+          Think Big Digital
+        </a>
+        . We believe SEO guidance should be accessible, actionable and focused on what business
+        owners can understand—not buried in technical jargon.
       </p>
 
-      <div className="glass p-8 mb-4 fade-up delay-3">
+      <div className="public-card mb-4">
         <div className="accent-bar">
-          <p style={{ fontFamily: 'var(--font-body)', fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--t-400)', marginBottom: '4px' }}>MISSION</p>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 600, color: 'var(--t-100)' }}>Our Mission</h2>
+          <p className="public-eyebrow" style={{ fontSize: '11px', marginBottom: '4px', color: '#6B7280' }}>
+            MISSION
+          </p>
+          <h2 className="public-heading-card">Our Mission</h2>
         </div>
-        <p className="mt-5" style={{ fontFamily: 'var(--font-body)', fontSize: '16px', color: 'var(--t-200)', lineHeight: 1.8 }}>
-          Most SEO tools overwhelm business owners with data they don&apos;t understand. We take a different approach: AI-powered advisory reports that speak your language and focus on what actually drives business growth.
+        <p className="public-body-md mt-5">
+          Most SEO tools overwhelm business owners with data they don&apos;t understand. This tool
+          takes a different approach: AI-powered advisory reports that review publicly visible pages
+          and explain opportunities in plain language—without numeric scores or technical error
+          dumps.
         </p>
       </div>
 
-      <div className="glass p-8 mb-4 fade-up delay-4">
+      <div className="public-card mb-4">
         <div className="accent-bar">
-          <p style={{ fontFamily: 'var(--font-body)', fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--t-400)', marginBottom: '4px' }}>DIFFERENTIATORS</p>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 600, color: 'var(--t-100)' }}>Why We&apos;re Different</h2>
+          <p className="public-eyebrow" style={{ fontSize: '11px', marginBottom: '4px', color: '#6B7280' }}>
+            DIFFERENTIATORS
+          </p>
+          <h2 className="public-heading-card">Why We&apos;re Different</h2>
         </div>
         <ul className="mt-5 space-y-4">
           {[
-            { title: 'Business-First Thinking:', desc: 'We focus on revenue impact, not vanity metrics' },
-            { title: 'Plain Language:', desc: 'No technical jargon — just clear, actionable guidance' },
-            { title: 'AI-Powered Insights:', desc: 'Advanced analysis delivered in seconds' },
-            { title: 'Strategic Roadmaps:', desc: 'Know exactly what to do next' },
+            {
+              title: 'Business-first thinking:',
+              desc: 'We focus on clarity, trust and visible positioning—not vanity metrics.',
+            },
+            {
+              title: 'Plain language:',
+              desc: 'No technical jargon—just clear, actionable guidance.',
+            },
+            {
+              title: 'Honest scope:',
+              desc: 'The tool reviews selected publicly visible pages; it is not a complete technical crawl.',
+            },
+            {
+              title: 'Prioritised direction:',
+              desc: 'Know which opportunities are worth addressing first.',
+            },
           ].map((item) => (
             <li key={item.title} className="flex items-start gap-3">
-              <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--em-400)' }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-              <span style={{ fontFamily: 'var(--font-body)', fontSize: '15px', color: 'var(--t-200)', lineHeight: 1.7 }}><strong style={{ color: 'var(--t-100)' }}>{item.title}</strong> {item.desc}</span>
+              <svg
+                className="w-4 h-4 mt-1 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                style={{ color: '#2E6BFF' }}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="public-body-md">
+                <strong style={{ color: '#0A0F1C' }}>{item.title}</strong> {item.desc}
+              </span>
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="glass p-8 mb-4 fade-up delay-5">
+      <div className="public-card mb-4">
         <div className="accent-bar">
-          <p style={{ fontFamily: 'var(--font-body)', fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--t-400)', marginBottom: '4px' }}>AUDIENCE</p>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 600, color: 'var(--t-100)' }}>Who It&apos;s For</h2>
+          <p className="public-eyebrow" style={{ fontSize: '11px', marginBottom: '4px', color: '#6B7280' }}>
+            AUDIENCE
+          </p>
+          <h2 className="public-heading-card">Who It&apos;s For</h2>
         </div>
-        <p className="mt-5" style={{ fontFamily: 'var(--font-body)', fontSize: '16px', color: 'var(--t-200)', lineHeight: 1.8 }}>
-          SEO AI is built for founders, business owners, and marketing leaders who need strategic SEO guidance without the complexity. Whether you&apos;re just starting to think about SEO or looking to improve your existing strategy, our reports give you the clarity you need to move forward confidently.
+        <p className="public-body-md mt-5">
+          Built for founders, business owners and marketing leaders who need strategic SEO guidance
+          without complexity. Start with a free Snapshot—no registration required—and unlock the
+          Detailed Report with your email when you need deeper analysis.
         </p>
       </div>
 
-      {/* Bottom CTA */}
-      <div className="glass-elevated p-10 text-center mt-12 relative fade-up delay-6">
-        <div className="accent-line-top" />
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--t-100)', marginBottom: '12px' }}>
-          Ready to Understand Your SEO?
+      <div className="public-card p-10 text-center mt-12">
+        <h2 className="public-heading-section" style={{ fontSize: '1.5rem', marginBottom: '12px' }}>
+          Ready to Understand Your Website?
         </h2>
-        <p style={{ fontFamily: 'var(--font-body)', fontSize: '16px', color: 'var(--t-200)', marginBottom: '24px' }}>
-          Get your free snapshot report and see the difference for yourself.
+        <p className="public-body-md mb-6">
+          Get your free Snapshot and see the difference for yourself.
         </p>
-        <Link href="/tool" className="btn btn-primary btn-lg">Generate Free Report</Link>
+        <Link href="/tool" className="btn btn-primary btn-lg">
+          Generate Free Snapshot
+        </Link>
       </div>
     </div>
   );

@@ -1,55 +1,43 @@
 import Link from 'next/link';
+import BrandLogo from '@/components/brand/BrandLogo';
+import {
+  THINK_BIG_HOME,
+  THINK_BIG_SERVICES,
+  THINK_BIG_CASE_STUDIES,
+  THINK_BIG_RECOMMENDATIONS,
+  THINK_BIG_ABOUT,
+  THINK_BIG_CONTACT,
+  THINK_BIG_CONTACT_FORM,
+  SEO_SUPPORT_EMAIL,
+  SEO_SUPPORT_PHONE_DISPLAY,
+  SEO_SUPPORT_PHONE_LINK,
+} from '@/lib/brand/links';
 
 export default function Footer() {
   return (
-    <footer className="mt-24" style={{ borderTop: '1px solid var(--glass-border)' }}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
+    <footer className="public-footer mt-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-14">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
           {/* Brand */}
-          <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-0.5 mb-4">
-              <span style={{ fontFamily: 'var(--font-display)', color: 'var(--t-100)', fontWeight: 700, fontSize: '18px' }}>
-                SEO
-              </span>
-              <span
-                className="inline-block w-1.5 h-1.5 rounded-full mx-0.5"
-                style={{ background: 'var(--em-500)', boxShadow: 'var(--em-glow-sm)' }}
-              />
-              <span style={{ fontFamily: 'var(--font-display)', color: 'var(--t-300)', fontWeight: 500, fontSize: '18px' }}>
-                AI
-              </span>
-            </Link>
-            <p style={{ color: 'var(--t-400)', fontSize: '14px', lineHeight: 1.7, fontFamily: 'var(--font-body)' }}>
-              AI-powered SEO advisory reports for business owners and founders.
+          <div className="sm:col-span-2 lg:col-span-1">
+            <BrandLogo size="footer" href={THINK_BIG_HOME} />
+            <p className="public-footer-product-name mt-4">SEO Snapshot</p>
+            <p className="public-footer-tagline mt-2">
+              A business-friendly SEO visibility tool from ThinkBig Digital Solutions Pvt Ltd.
             </p>
           </div>
 
           {/* Product */}
           <div>
-            <h4
-              className="mb-4"
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: '11px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase' as const,
-                color: 'var(--t-400)',
-              }}
-            >
-              Product
-            </h4>
-            <ul className="space-y-2.5">
+            <h2 className="public-footer-heading">Product</h2>
+            <ul className="space-y-2">
               {[
                 { href: '/tool', label: 'Generate Report' },
                 { href: '/how-it-works', label: 'How It Works' },
+                { href: '/faq', label: 'FAQ' },
               ].map((link) => (
                 <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm transition-colors duration-200 hover:text-emerald-400"
-                    style={{ color: 'var(--t-300)', fontFamily: 'var(--font-body)' }}
-                  >
+                  <Link href={link.href} className="public-footer-link">
                     {link.label}
                   </Link>
                 </li>
@@ -57,72 +45,63 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Company */}
+          {/* Think Big Digital */}
           <div>
-            <h4
-              className="mb-4"
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: '11px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase' as const,
-                color: 'var(--t-400)',
-              }}
-            >
-              Company
-            </h4>
-            <ul className="space-y-2.5">
+            <h2 className="public-footer-heading">Think Big Digital</h2>
+            <ul className="space-y-2">
               {[
-                { href: '/about', label: 'About' },
-                { href: '/contact', label: 'Contact' },
+                { href: THINK_BIG_HOME, label: 'Home' },
+                { href: THINK_BIG_SERVICES.split('?')[0], label: 'Services' },
+                { href: THINK_BIG_CASE_STUDIES, label: 'Case Studies' },
+                { href: THINK_BIG_RECOMMENDATIONS, label: 'Recommendations' },
+                { href: THINK_BIG_ABOUT, label: 'About' },
+                { href: THINK_BIG_CONTACT, label: 'Contact' },
               ].map((link) => (
                 <li key={link.href}>
-                  <Link
+                  <a
                     href={link.href}
-                    className="text-sm transition-colors duration-200 hover:text-emerald-400"
-                    style={{ color: 'var(--t-300)', fontFamily: 'var(--font-body)' }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="public-footer-link"
                   >
                     {link.label}
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Support */}
+          {/* Contact */}
           <div>
-            <h4
-              className="mb-4"
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: '11px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase' as const,
-                color: 'var(--t-400)',
-              }}
-            >
-              Support
-            </h4>
-            <ul className="space-y-2.5">
+            <h2 className="public-footer-heading">Contact</h2>
+            <ul className="space-y-2">
               <li>
-                <Link
-                  href="/faq"
-                  className="text-sm transition-colors duration-200 hover:text-emerald-400"
-                  style={{ color: 'var(--t-300)', fontFamily: 'var(--font-body)' }}
+                <a href={SEO_SUPPORT_EMAIL} className="public-footer-link public-footer-contact">
+                  grow@thinkbigdigital.in
+                </a>
+              </li>
+              <li>
+                <a href={SEO_SUPPORT_PHONE_LINK} className="public-footer-link public-footer-contact">
+                  {SEO_SUPPORT_PHONE_DISPLAY}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={THINK_BIG_CONTACT_FORM}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="public-footer-link"
                 >
-                  FAQ
-                </Link>
+                  Discuss SEO Support
+                </a>
               </li>
             </ul>
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="divider mt-10 mb-8" />
-        <p className="text-center" style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-400)' }}>
-          &copy; {new Date().getFullYear()} SEO AI. All rights reserved.
+        <div className="public-footer-divider mt-10 mb-6" />
+        <p className="public-footer-copyright text-center">
+          &copy; 2026 ThinkBig Digital Solutions Pvt Ltd. All rights reserved.
         </p>
       </div>
     </footer>

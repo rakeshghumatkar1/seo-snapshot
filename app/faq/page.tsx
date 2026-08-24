@@ -2,55 +2,78 @@ import Link from 'next/link';
 
 export default function FAQPage() {
   const faqs = [
-    { q: 'Is the snapshot report really free?', a: 'Yes! The snapshot report is completely free with no credit card required. Simply enter your website URL and receive instant AI-powered insights about your SEO position.' },
-    { q: "What's the difference between snapshot and detailed reports?", a: 'The snapshot report gives you a high-level overview of your SEO position, key opportunities, and next steps. The detailed report includes everything in the snapshot plus comprehensive technical review, competitive landscape analysis, strategic keyword direction, content strategy recommendations, 6-month implementation roadmap, and downloadable PDF report.' },
-    { q: 'How long does it take to generate a report?', a: "Snapshot reports are generated in seconds. Detailed reports may take a bit longer as they include more comprehensive analysis, but you'll typically have your report within a minute." },
-    { q: 'Do I need technical SEO knowledge to understand the reports?', a: 'Not at all! Our reports are written in plain language for business owners and founders. We avoid technical jargon and focus on actionable insights you can actually use.' },
-    { q: 'Is this a technical SEO crawler?', a: 'No. SEO AI is an AI-powered advisory tool, not a technical crawler. We focus on strategic guidance and business-first recommendations rather than overwhelming you with technical data points.' },
-    { q: 'Can I generate reports for multiple websites?', a: "Yes! You can generate snapshot reports for as many websites as you'd like. Each report is tailored to the specific website you analyze." },
+    {
+      q: 'Is the Snapshot report really free?',
+      a: 'Yes. The Snapshot report is free and visible without registration or a credit card. Simply enter your website URL to receive a business-friendly review of selected publicly visible pages.',
+    },
+    {
+      q: "What's the difference between Snapshot and Detailed reports?",
+      a: 'The Snapshot gives you a concise review of visible business positioning, content clarity, trust signals and up to three priority areas—visible immediately without signup. The Detailed Report includes everything in the Snapshot plus deeper positioning review, customer-search directions, competitive-readiness observations, a prioritised improvement roadmap with five or six sequenced priorities, and a downloadable report where supported. Email is required for the Detailed Report.',
+    },
+    {
+      q: 'How long does it take to generate a report?',
+      a: 'Snapshot reports are typically ready within a short wait while the AI reviews visible pages. Detailed reports may take longer because they include more comprehensive analysis.',
+    },
+    {
+      q: 'Do I need technical SEO knowledge to understand the reports?',
+      a: 'Not at all. Reports are written in plain language for business owners and founders. We avoid technical jargon and focus on observations and priorities you can actually use.',
+    },
+    {
+      q: 'Is this a technical SEO crawler?',
+      a: 'No. This is an AI-powered advisory tool that reviews selected publicly visible pages for messaging, content usefulness, visible structure and trust signals. It does not perform a complete technical crawl, rank tracking or competitive data analysis.',
+    },
+    {
+      q: 'Can I generate reports for multiple websites?',
+      a: 'You can analyze different websites over time. Usage may be subject to reasonable rate limits to keep the service available for everyone.',
+    },
   ];
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-16">
+    <div className="public-page-content max-w-3xl mx-auto px-6 py-16">
       <div className="text-center mb-12">
-        <div className="badge badge-emerald mx-auto mb-4 fade-up">SUPPORT</div>
-        <h1
-          className="fade-up delay-1"
-          style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h1)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, color: 'var(--t-100)', marginBottom: '12px' }}
-        >
-          Frequently Asked Questions
-        </h1>
-        <p className="fade-up delay-2" style={{ fontFamily: 'var(--font-body)', fontSize: '18px', color: 'var(--t-200)' }}>
-          Everything you need to know about SEO AI
+        <p className="public-eyebrow mb-4" style={{ color: '#2E6BFF' }}>
+          SUPPORT
+        </p>
+        <h1 className="public-heading-section mb-3">Frequently Asked Questions</h1>
+        <p className="public-body-lg">
+          Everything you need to know about the SEO &amp; Business Visibility Snapshot
         </p>
       </div>
 
       <div className="space-y-4">
-        {faqs.map((faq, i) => (
-          <div key={i} className={`glass p-8 fade-up delay-${Math.min(i + 3, 7)}`}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600, color: 'var(--t-100)', marginBottom: '8px' }}>{faq.q}</h2>
-            <p style={{ fontFamily: 'var(--font-body)', fontSize: '15px', color: 'var(--t-200)', lineHeight: 1.7 }}>{faq.a}</p>
+        {faqs.map((faq) => (
+          <div key={faq.q} className="public-card">
+            <h2 className="public-heading-card" style={{ marginBottom: '8px' }}>
+              {faq.q}
+            </h2>
+            <p className="public-body-md">{faq.a}</p>
           </div>
         ))}
 
-        <div className="glass p-8">
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600, color: 'var(--t-100)', marginBottom: '8px' }}>What if I have more questions?</h2>
-          <p style={{ fontFamily: 'var(--font-body)', fontSize: '15px', color: 'var(--t-200)', lineHeight: 1.7 }}>
-            We&apos;re here to help! Visit our <Link href="/contact" className="text-emerald-400 hover:text-emerald-300 transition-colors">contact page</Link> to get in touch with our team.
+        <div className="public-card">
+          <h2 className="public-heading-card" style={{ marginBottom: '8px' }}>
+            What if I have more questions?
+          </h2>
+          <p className="public-body-md">
+            Visit our{' '}
+            <Link href="/contact" className="public-link">
+              contact page
+            </Link>{' '}
+            to reach Think Big Digital about your report, implementation priorities or SEO support.
           </p>
         </div>
       </div>
 
-      {/* Bottom CTA */}
-      <div className="glass-elevated p-10 text-center mt-12 relative">
-        <div className="accent-line-top" />
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-h2)', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--t-100)', marginBottom: '12px' }}>
+      <div className="public-card p-10 text-center mt-12">
+        <h2 className="public-heading-section" style={{ fontSize: '1.5rem', marginBottom: '12px' }}>
           Ready to Try It?
         </h2>
-        <p style={{ fontFamily: 'var(--font-body)', fontSize: '16px', color: 'var(--t-200)', marginBottom: '24px' }}>
-          See for yourself how easy it is to get professional SEO insights.
+        <p className="public-body-md mb-6">
+          See how a business-friendly Snapshot can clarify your website opportunities.
         </p>
-        <Link href="/tool" className="btn btn-primary btn-lg">Generate Free Snapshot</Link>
+        <Link href="/tool" className="btn btn-primary btn-lg">
+          Generate Free Snapshot
+        </Link>
       </div>
     </div>
   );

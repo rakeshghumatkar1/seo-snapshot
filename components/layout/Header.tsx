@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import BrandLogo from '@/components/brand/BrandLogo';
+import { THINK_BIG_HOME } from '@/lib/brand/links';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -11,6 +12,9 @@ const navLinks = [
   { href: '/about', label: 'About' },
   { href: '/faq', label: 'FAQ' },
 ];
+
+const contactFormUrl =
+  'https://thinkbigdigital.co/contact?utm_source=seo-tool&utm_medium=referral&utm_campaign=seo-snapshot#contact-form';
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -26,114 +30,82 @@ export default function Header() {
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [mobileOpen]);
 
   return (
     <>
-      <header className="sticky top-0 z-50 header-glass">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-0.5 group">
-              <span
-                className="text-xl font-bold"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--t-100)', fontWeight: 700 }}
-              >
-                SEO
-              </span>
-              <span
-                className="inline-block w-1.5 h-1.5 rounded-full mx-0.5"
-                style={{
-                  background: 'var(--em-500)',
-                  boxShadow: 'var(--em-glow-sm)',
-                }}
-              />
-              <span
-                className="text-xl font-medium"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--t-300)', fontWeight: 500 }}
-              >
-                AI
-              </span>
-            </Link>
+      <header className="public-header sticky top-0 z-50">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
+          <div className="public-header-inner flex justify-between items-center gap-3 lg:gap-5">
+            {/* Brand lockup: stacked dark logo + product name */}
+            <div className="public-header-brand flex items-center shrink-0">
+              <BrandLogo size="header" />
+              <Link href="/" className="public-product-lockup">
+                <span className="block public-product-name">SEO Snapshot</span>
+                <span className="block public-product-descriptor">A Think Big Digital Tool</span>
+              </Link>
+            </div>
 
-            {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-1">
+            {/* Desktop Nav — xl so 1024px uses compact menu without horizontal squeeze */}
+            <div className="public-header-desktop-nav hidden xl:flex items-center gap-0.5">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="relative px-4 py-2 text-sm font-medium transition-colors duration-200"
-                    style={{
-                      fontFamily: 'var(--font-body)',
-                      color: isActive ? 'var(--em-400)' : 'var(--t-300)',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) (e.target as HTMLElement).style.color = 'var(--t-100)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) (e.target as HTMLElement).style.color = 'var(--t-300)';
-                    }}
+                    className={`public-nav-link ${isActive ? 'public-nav-link-active' : ''}`}
+                    aria-current={isActive ? 'page' : undefined}
                   >
                     {link.label}
-                    {isActive && (
-                      <span
-                        className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-                        style={{ background: 'var(--em-400)', boxShadow: '0 0 6px var(--em-400)' }}
-                      />
-                    )}
                   </Link>
                 );
               })}
+              <a
+                href={THINK_BIG_HOME}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="public-nav-link public-nav-link-external"
+              >
+                Think Big Digital
+                <span className="sr-only"> (opens in new tab)</span>
+              </a>
+              <a
+                href={contactFormUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="public-nav-link public-nav-link-external"
+              >
+                Discuss SEO Support
+                <span className="sr-only"> (opens in new tab)</span>
+              </a>
             </div>
 
             {/* Desktop CTA */}
-            <div className="hidden md:flex items-center gap-2">
-              <ThemeToggle />
-              <Link
-                href="/tool"
-                className="btn btn-secondary"
-                style={{ padding: '8px 20px', fontSize: '13px' }}
-              >
-                Try Free
-                <span aria-hidden="true"> →</span>
+            <div className="hidden xl:flex items-center shrink-0">
+              <Link href="/tool" className="btn btn-primary public-header-cta">
+                Generate Free Snapshot
               </Link>
             </div>
 
-            {/* Mobile Right */}
-            <div className="flex md:hidden items-center gap-2">
-              <ThemeToggle />
+            {/* Mobile / tablet menu button */}
+            <div className="flex xl:hidden items-center shrink-0">
               <button
-                className="relative w-10 h-10 flex items-center justify-center rounded-lg"
+                type="button"
+                className="public-mobile-menu-btn"
                 onClick={() => setMobileOpen(!mobileOpen)}
+                aria-expanded={mobileOpen}
+                aria-controls="mobile-nav-panel"
                 aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-                style={{ background: 'var(--glass-1)', border: '1px solid var(--glass-border)' }}
               >
-                <div className="w-5 h-4 relative flex flex-col justify-between">
-                  <span
-                    className="block h-[1.5px] w-full rounded-full transition-all duration-300"
-                    style={{
-                      background: 'var(--t-200)',
-                      transform: mobileOpen ? 'translateY(7.25px) rotate(45deg)' : 'none',
-                    }}
-                  />
-                  <span
-                    className="block h-[1.5px] w-full rounded-full transition-all duration-300"
-                    style={{
-                      background: 'var(--t-200)',
-                      opacity: mobileOpen ? 0 : 1,
-                    }}
-                  />
-                  <span
-                    className="block h-[1.5px] w-full rounded-full transition-all duration-300"
-                    style={{
-                      background: 'var(--t-200)',
-                      transform: mobileOpen ? 'translateY(-7.25px) rotate(-45deg)' : 'none',
-                    }}
-                  />
-                </div>
+                <span className="public-mobile-menu-icon" data-open={mobileOpen}>
+                  <span />
+                  <span />
+                  <span />
+                </span>
               </button>
             </div>
           </div>
@@ -143,34 +115,52 @@ export default function Header() {
       {/* Mobile Nav Overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 flex flex-col items-center justify-center mobile-nav-overlay mobile-nav-bg md:hidden"
+          id="mobile-nav-panel"
+          className="public-mobile-nav xl:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile navigation"
         >
-          <nav className="flex flex-col items-center gap-2">
-            {navLinks.map((link, i) => {
+          <nav className="flex flex-col items-stretch gap-1 p-6 pt-24 max-w-md mx-auto w-full">
+            {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className="px-6 py-3 text-2xl font-semibold transition-colors duration-200 fade-up"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    color: isActive ? 'var(--em-400)' : 'var(--t-200)',
-                    animationDelay: `${i * 60}ms`,
-                  }}
+                  className={`public-mobile-nav-link ${isActive ? 'public-mobile-nav-link-active' : ''}`}
+                  aria-current={isActive ? 'page' : undefined}
                 >
                   {link.label}
                 </Link>
               );
             })}
-            <div className="mt-6 fade-up" style={{ animationDelay: '240ms' }}>
+            <a
+              href={THINK_BIG_HOME}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="public-mobile-nav-link public-mobile-nav-link-external"
+              onClick={() => setMobileOpen(false)}
+            >
+              Think Big Digital
+            </a>
+            <a
+              href={contactFormUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="public-mobile-nav-link public-mobile-nav-link-external"
+              onClick={() => setMobileOpen(false)}
+            >
+              Discuss SEO Support
+            </a>
+            <div className="mt-6 pt-6 public-mobile-nav-divider">
               <Link
                 href="/tool"
                 onClick={() => setMobileOpen(false)}
-                className="btn btn-primary btn-lg"
+                className="btn btn-primary btn-lg w-full justify-center"
               >
-                Try Free →
+                Generate Free Snapshot
               </Link>
             </div>
           </nav>

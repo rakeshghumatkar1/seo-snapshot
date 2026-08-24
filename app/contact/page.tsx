@@ -1,104 +1,97 @@
-import Card from '@/components/ui/Card';
+import Link from 'next/link';
+import {
+  THINK_BIG_CONTACT_FORM,
+  THINK_BIG_SERVICES,
+  SEO_SUPPORT_EMAIL,
+  SEO_SUPPORT_PHONE_DISPLAY,
+  SEO_SUPPORT_PHONE_LINK,
+} from '@/lib/brand/links';
 
 export default function ContactPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4 text-center">Contact Us</h1>
-      <p className="text-lg text-white/50 text-center mb-12">
-        Have questions? We&apos;d love to hear from you.
+    <div className="public-page-content max-w-3xl mx-auto px-6 py-16">
+      <p className="public-eyebrow mb-4" style={{ color: '#2E6BFF' }}>
+        GET IN TOUCH
+      </p>
+      <h1 className="public-heading-section mb-4">Contact &amp; SEO Support</h1>
+      <p className="public-body-lg mb-12">
+        Have questions about your report, implementation priorities or broader SEO requirements?
+        Think Big Digital can help you discuss next steps—without promising guaranteed rankings or
+        outcomes.
       </p>
 
       <div className="grid md:grid-cols-2 gap-6 mb-10">
-        <Card>
-          <div className="text-center">
-            <div className="w-14 h-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h2 className="text-lg font-bold text-white mb-2">Email Us</h2>
-            <p className="text-white/50 text-sm mb-3">
-              For general inquiries and support
-            </p>
-            <a href="mailto:hello@seosnapshot.com" className="text-emerald-400 hover:text-emerald-300 transition-colors font-semibold text-sm">
-              hello@seosnapshot.com
-            </a>
+        <div className="public-card text-center">
+          <div className="public-card-icon mx-auto">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
           </div>
-        </Card>
+          <h2 className="public-heading-card mb-2">Think Big Digital Contact Form</h2>
+          <p className="public-body-sm mb-4">
+            Discuss your Snapshot findings, implementation help or broader SEO requirements.
+          </p>
+          <a
+            href={THINK_BIG_CONTACT_FORM}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary"
+          >
+            Open Contact Form
+          </a>
+        </div>
 
-        <Card>
-          <div className="text-center">
-            <div className="w-14 h-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 className="text-lg font-bold text-white mb-2">Support</h2>
-            <p className="text-white/50 text-sm mb-3">
-              Need help with your report?
-            </p>
-            <a href="mailto:support@seosnapshot.com" className="text-emerald-400 hover:text-emerald-300 transition-colors font-semibold text-sm">
-              support@seosnapshot.com
+        <div className="public-card text-center">
+          <div className="public-card-icon mx-auto">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+              />
+            </svg>
+          </div>
+          <h2 className="public-heading-card mb-2">Direct SEO Support</h2>
+          <p className="public-body-sm mb-4">Reach the Think Big Digital team directly.</p>
+          <div className="flex flex-col gap-2">
+            <a href={SEO_SUPPORT_EMAIL} className="public-link">
+              grow@thinkbigdigital.in
+            </a>
+            <a href={SEO_SUPPORT_PHONE_LINK} className="public-link">
+              {SEO_SUPPORT_PHONE_DISPLAY}
             </a>
           </div>
-        </Card>
+        </div>
       </div>
 
-      <Card>
-        <h2 className="text-xl font-bold text-white mb-6 section-accent">Send Us a Message</h2>
-        <div className="text-sm text-yellow-600 bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
-          Contact form coming soon. For now, reach us at hello@seosnapshot.com
-        </div>
-        <form className="space-y-5">
-          <div>
-            <label htmlFor="contact-name" className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
-              Name
-            </label>
-            <input
-              id="contact-name"
-              type="text"
-              className="glass-input w-full px-4 py-2.5"
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="contact-email" className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
-              Email
-            </label>
-            <input
-              id="contact-email"
-              type="email"
-              className="glass-input w-full px-4 py-2.5"
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="contact-subject" className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
-              Subject
-            </label>
-            <input
-              id="contact-subject"
-              type="text"
-              className="glass-input w-full px-4 py-2.5"
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="contact-message" className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
-              Message
-            </label>
-            <textarea
-              id="contact-message"
-              rows={6}
-              className="glass-input w-full px-4 py-2.5"
-              required
-            />
-          </div>
-          <p className="text-xs text-white/30">
-            Note: This is a demo form. In production, this would be connected to an email service.
-          </p>
-        </form>
-      </Card>
+      <div className="public-card p-8 text-center">
+        <h2 className="public-heading-card mb-3">Explore Services</h2>
+        <p className="public-body-md mb-6">
+          Learn how Think Big Digital can help with website, SEO and content improvements based on
+          your business goals.
+        </p>
+        <a
+          href={THINK_BIG_SERVICES}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-secondary btn-lg"
+        >
+          View Think Big Services
+        </a>
+      </div>
+
+      <p className="public-body-sm text-center mt-8">
+        Prefer to generate a report first?{' '}
+        <Link href="/tool" className="public-link">
+          Generate a free Snapshot
+        </Link>
+      </p>
     </div>
   );
 }

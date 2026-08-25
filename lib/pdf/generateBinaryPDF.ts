@@ -25,6 +25,8 @@ type PDFLine = {
   leading: number
 }
 
+type ReportSections = object
+
 function asciiText(value: unknown): string {
   return String(value ?? '')
     .normalize('NFKD')
@@ -75,7 +77,7 @@ function buildLines({
 }: {
   websiteUrl: string
   reportType: string
-  sections: Record<string, string>
+  sections: ReportSections
 }): PDFLine[] {
   const generated = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -142,7 +144,7 @@ function pageStream(lines: PDFLine[]): string {
 export function buildPDFBuffer(data: {
   websiteUrl: string
   reportType: string
-  sections: Record<string, string>
+  sections: ReportSections
 }): Buffer {
   const pages = splitPages(buildLines(data))
   const objects: string[] = []

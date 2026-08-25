@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateSnapshotReport } from '@/lib/ai/generateSnapshotReport';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/rateLimit/getIp';
-import { insertReport } from '@/lib/db/schema';
+import { insertArchivedReport } from '@/lib/db/reportArchive';
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,15 +62,15 @@ export async function POST(request: NextRequest) {
       sections: result.sections,
     };
 
-    // Log report asynchronously
-    insertReport({
+    // Archive report content and a permanent PDF asynchronously.
+    insertArchivedReport({
       websiteUrl: cleanUrl,
       reportType: 'snapshot',
       email: undefined,
       status: 'success',
       sectionsJson: result.sections,
     }).catch(err =>
-      console.error('[Snapshot] Report log failed:', err)
+      console.error('[Snapshot] Report archive failed:', err)
     );
 
     return NextResponse.json(report);

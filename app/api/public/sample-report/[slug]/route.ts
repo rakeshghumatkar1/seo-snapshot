@@ -67,7 +67,10 @@ export async function GET(
       isAnonymizedSample: mode === 'anonymized',
     }, {
       headers: {
-        'Cache-Control': 'no-store, max-age=0',
+        'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
+        'X-Sample-Mode': mode,
+        'X-Sample-Use': String(Boolean(row.use_as_sample)),
+        'X-Sample-Status': String(row.anonymization_status || ''),
       },
     })
   } catch (err) {

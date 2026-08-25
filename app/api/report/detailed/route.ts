@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateDetailedReport } from '@/lib/ai/generateDetailedReport';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/rateLimit/getIp';
-import { insertReport, getConfig } from '@/lib/db/schema';
+import { getConfig } from '@/lib/db/schema';
+import { insertArchivedReport } from '@/lib/db/reportArchive';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     console.log(`[RateLimit] IP ${ip}: ${rateLimit.remaining} remaining today`);
 
     const body = await request.json();
-    const { websiteUrl, email, name, company } = body;
+    const { websiteUrl, email } = body;
 
     if (!websiteUrl || typeof websiteUrl !== 'string') {
       return NextResponse.json(
@@ -66,15 +67,15 @@ export async function POST(request: NextRequest) {
       sections: result.sections,
     };
 
-    // Log report asynchronously
-    insertReport({
+    // Archive report content and a permanent PDF asynchronously.
+    insertArchivedReport({
       websiteUrl: cleanUrl,
       reportType: 'detailed',
-      email: email,
+      email,
       status: 'success',
       sectionsJson: result.sections,
     }).catch(err =>
-      console.error('[Detailed] Report log failed:', err)
+      console.error('[Detailed] Report archive failed:', err)
     );
 
     return NextResponse.json(report);

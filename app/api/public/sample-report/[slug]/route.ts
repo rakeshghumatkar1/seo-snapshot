@@ -65,6 +65,10 @@ export async function GET(
       sections: cleanSections,
       sampleContentMode: mode,
       isAnonymizedSample: mode === 'anonymized',
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
     })
   } catch (err) {
     console.error('[public/sample-report]', err)

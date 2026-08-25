@@ -239,6 +239,7 @@ export async function getPublicSampleBySlug(slug: string) {
       hs.anonymization_status,
       hs.anonymized_sections_json,
       hs.anonymized_report_version,
+      hs.use_as_sample,
       hs.updated_at,
       r.report_type,
       r.created_at,
@@ -249,16 +250,25 @@ export async function getPublicSampleBySlug(slug: string) {
        AND hs.is_active = TRUE
        AND hs.use_as_sample = TRUE
        AND COALESCE(r.status, 'success') = 'success'
+       AND (
+         COALESCE(hs.sample_content_mode, 'source') = 'source'
+         OR (
+           hs.sample_content_mode = 'anonymized'
+           AND hs.anonymization_status = 'published'
+           AND hs.anonymized_sections_json IS NOT NULL
+         )
+       )
      LIMIT 1`,
     [slug]
   )
   const row = rows[0] || null
   if (!row) return null
 
-  // Anonymised samples must never fall back to original sections_json
+  // Defense in depth: anonymised samples must never fall back to original sections
   if (row.sample_content_mode === 'anonymized') {
     if (
       row.anonymization_status !== 'published' ||
+      !row.use_as_sample ||
       !row.anonymized_sections_json ||
       typeof row.anonymized_sections_json !== 'object'
     ) {

@@ -4,6 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+import { detectReportVersion } from '@/types/report'
+import {
+  getSectionLabel,
+  iterableSectionEntries,
+} from '@/lib/report/sectionLabels'
+
 type ReportType = 'all' | 'snapshot' | 'detailed'
 type SortDirection = 'asc' | 'desc'
 
@@ -13,7 +19,7 @@ interface ReportRow {
   report_type: string
   email: string | null
   status: string | null
-  sections_json: Record<string, string> | null
+  sections_json: Record<string, unknown> | null
   created_at: string
   pdf_filename: string | null
   pdf_generated_at: string | null
@@ -28,27 +34,6 @@ interface Summary {
 }
 
 const EMPTY_SUMMARY: Summary = { total: 0, snapshot: 0, detailed: 0, pdfCount: 0 }
-
-const SECTION_LABELS: Record<string, string> = {
-  introduction: 'Introduction',
-  whySeoMatters: 'Why SEO Matters',
-  firstImpression: 'First Impression',
-  contentVisibility: 'Content & Visibility',
-  competitorPresence: 'Competitor Presence',
-  keywordOpportunities: 'Keyword Opportunities',
-  technicalObservations: 'Technical Observations',
-  whatCanBeImproved: 'What Can Be Improved',
-  websitePositioning: 'Website Positioning',
-  contentStrategy: 'Content Strategy',
-  competitorLandscape: 'Competitor Landscape',
-  keywordDirection: 'Keyword Direction',
-  technicalSignals: 'Technical Signals',
-  authorityTrust: 'Authority & Trust',
-  seoRoadmap: 'SEO Roadmap',
-  detailedRecommendations: 'Detailed Recommendations',
-  nextSteps: 'Next Steps',
-  conclusion: 'Conclusion',
-}
 
 function formatDate(value: string) {
   if (!value) return '—'
@@ -296,12 +281,18 @@ export default function ReportsLibraryPage() {
             </div>
 
             <div style={{ padding: '22px', overflowY: 'auto' }}>
-              {Object.entries(viewing.sections_json || {}).filter(([, value]) => Boolean(value)).map(([key, value]) => (
-                <div key={key} style={{ marginBottom: '18px', padding: '16px 18px', border: '1px solid var(--glass-border)', borderLeft: '3px solid #10b981', borderRadius: '8px', background: 'rgba(255,255,255,0.025)' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--t-100)', marginBottom: '8px' }}>{SECTION_LABELS[key] || key}</div>
-                  <div style={{ whiteSpace: 'pre-wrap', color: 'var(--t-300)', fontSize: '12px', lineHeight: 1.7 }}>{String(value)}</div>
-                </div>
-              ))}
+              {iterableSectionEntries(viewing.sections_json || {}).map(([key, value]) => {
+                const reportType = viewing.report_type === 'detailed' ? 'detailed' : 'snapshot'
+                const version = detectReportVersion(viewing.sections_json || {})
+                const label = getSectionLabel(key, reportType, version)
+                return (
+                  <div key={key} style={{ marginBottom: '18px', padding: '16px 18px', border: '1px solid var(--glass-border)', borderLeft: '3px solid #10b981', borderRadius: '8px', background: 'rgba(255,255,255,0.025)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--t-400)', marginBottom: '4px' }}>{label.category}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--t-100)', marginBottom: '8px' }}>{label.title}</div>
+                    <div style={{ whiteSpace: 'pre-wrap', color: 'var(--t-300)', fontSize: '12px', lineHeight: 1.7 }}>{value}</div>
+                  </div>
+                )
+              })}
             </div>
 
             <div style={{ padding: '14px 22px 18px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--glass-border)' }}>

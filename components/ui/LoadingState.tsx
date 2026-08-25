@@ -3,19 +3,15 @@
 import React, { useState, useEffect } from 'react';
 
 const loadingMessages = [
-  "Fetching the website pages...",
-  "Reading the homepage content...",
-  "Extracting headings and site structure...",
-  "Identifying services and offerings...",
-  "Checking which pages exist and which are missing...",
-  "Analysing the navigation structure...",
-  "Researching the competitive landscape...",
-  "Identifying keyword opportunities...",
-  "Evaluating content depth and gaps...",
-  "Sarah is writing the SEO report...",
-  "Reviewing trust signals and authority...",
-  "Finalising recommendations...",
-  "Almost done — polishing the report...",
+  'Understanding your business and customer journey...',
+  'Reviewing important service pages...',
+  'Assessing trust and credibility signals...',
+  'Checking search readiness...',
+  'Assessing AI discovery readiness...',
+  'Reviewing enquiry paths...',
+  'Prioritising business opportunities...',
+  'Building your action roadmap...',
+  'Almost done — polishing the report...',
 ];
 
 export default function LoadingState() {

@@ -843,7 +843,7 @@ export default function AdminDashboard() {
                   )}
                   {testResult !== null && !testLoading && (
                     <div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#34d399', marginBottom: '8px', letterSpacing: '0.04em' }}>INTRODUCTION preview:</div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#34d399', marginBottom: '8px', letterSpacing: '0.04em' }}>Report preview:</div>
                       <div style={{ padding: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '8px', fontSize: '12px', color: 'var(--t-200)', lineHeight: '1.7', whiteSpace: 'pre-wrap' as const, maxHeight: '400px', overflowY: 'auto' }}>
                         {testResult}
                       </div>

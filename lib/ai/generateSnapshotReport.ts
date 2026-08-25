@@ -3,28 +3,32 @@ import {
   SNAPSHOT_SYSTEM_PROMPT,
   buildSnapshotPrompt,
 } from './prompts/snapshotPrompt'
-import { parseSnapshotReport } from './parseReport'
-import { fetchWebsiteContent } from './fetchWebsite'
+import { isValidSnapshotV3Prompt } from './prompts/promptValidation'
+import { parseSnapshotReportV3 } from './parseReportV3'
+import { buildWebsiteEvidencePackage } from './website/buildEvidencePackage'
+import { formatEvidenceForAI } from './website/formatEvidenceForAI'
 import { dbQuery } from '@/lib/db/client'
 import type { SnapshotSections } from '@/types/report'
 
-async function getSystemPrompt(key: string, fallback: string): Promise<string> {
+async function getSnapshotSystemPrompt(): Promise<string> {
   try {
     const rows = await dbQuery(
       `SELECT content FROM prompts WHERE key = $1`,
-      [key]
+      ['snapshot_system_prompt']
     )
     const dbPrompt = rows.length > 0 ? rows[0].content : null
-    console.log('[Prompt] DB value:', dbPrompt?.substring(0, 50))
-    if (dbPrompt?.trim()) {
-      console.log('[Prompt] Source: DB')
+    if (dbPrompt?.trim() && isValidSnapshotV3Prompt(dbPrompt)) {
+      console.log('[Snapshot] Prompt source: DB (V3 validated)')
       return dbPrompt
     }
+    if (dbPrompt?.trim()) {
+      console.warn('[Snapshot] Ignoring non-V3 DB prompt; using hardcoded V3')
+    }
   } catch (err) {
-    console.error('[Prompt] DB query error:', err)
+    console.error('[Snapshot] Prompt DB query error:', err)
   }
-  console.log('[Prompt] Source: hardcoded')
-  return fallback
+  console.log('[Snapshot] Prompt source: hardcoded V3')
+  return SNAPSHOT_SYSTEM_PROMPT
 }
 
 export async function generateSnapshotReport(
@@ -32,41 +36,16 @@ export async function generateSnapshotReport(
 ): Promise<{
   sections: SnapshotSections
   raw?: string
+  reportVersion: 3
 } | null> {
+  console.log('[Snapshot] Building V3 evidence package:', websiteUrl)
 
-  console.log('[Snapshot] Fetching website:', websiteUrl)
+  const evidence = await buildWebsiteEvidencePackage(websiteUrl, { depth: 'snapshot' })
+  console.log('[Snapshot] Pages reviewed:', evidence.analysisCoverage.pagesReviewed)
 
-  const websiteContent = await fetchWebsiteContent(
-    websiteUrl
-  )
-
-  const pagesFound =
-    1 + websiteContent.additionalPages.length
-
-  console.log('[Snapshot] Pages collected:', pagesFound)
-
-  // Build content context for prompt
-  const contentContext = websiteContent.allText
-    ? `
-WEBSITE RESEARCH DATA:
-Domain: ${websiteContent.domain}
-Pages analyzed: ${pagesFound} page(s) found
-
-${websiteContent.allText}
-
-END OF WEBSITE DATA
-
-Use the above real website content to make your report specific to this business.
-Base all observations on what is actually visible in the content above.
-`
-    : ''
-
-  const prompt = buildSnapshotPrompt(
-    websiteUrl,
-    contentContext
-  )
-
-  const systemPrompt = await getSystemPrompt('snapshot_system_prompt', SNAPSHOT_SYSTEM_PROMPT)
+  const evidenceContext = formatEvidenceForAI(evidence, 'snapshot')
+  const prompt = buildSnapshotPrompt(websiteUrl, evidenceContext)
+  const systemPrompt = await getSnapshotSystemPrompt()
 
   const result = await generateWithAI({
     prompt,
@@ -74,18 +53,15 @@ Base all observations on what is actually visible in the content above.
   })
 
   if (!result.success || !result.text) {
-    console.error(
-      '[Snapshot] Generation failed:', result.error
-    )
+    console.error('[Snapshot] Generation failed:', result.error)
     return null
   }
 
-  const sections = parseSnapshotReport(result.text)
-
+  const sections = parseSnapshotReportV3(result.text)
   if (!sections) {
-    console.error('[Snapshot] Parsing failed')
+    console.error('[Snapshot] V3 parsing failed')
     return null
   }
 
-  return { sections, raw: result.text }
+  return { sections, raw: result.text, reportVersion: 3 }
 }

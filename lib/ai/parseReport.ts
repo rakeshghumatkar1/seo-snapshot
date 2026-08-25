@@ -1,4 +1,9 @@
-import type { SnapshotSections, DetailedSections } from '@/types/report'
+import type { SnapshotSectionsV2, DetailedSectionsV2 } from '@/types/report'
+
+/**
+ * Legacy V2 parsers — retained only for historical/compatibility tooling.
+ * Active generation uses parseReportV3.ts.
+ */
 
 function parseAllSections(
   text: string,
@@ -14,7 +19,7 @@ function parseAllSections(
     const keyIndex = text.indexOf(keyWithColon)
 
     if (keyIndex === -1) {
-      console.warn('[Parser] Key not found:', key)
+      console.warn('[ParserV2] Key not found:', key)
       result[key] = ''
       continue
     }
@@ -44,13 +49,8 @@ function parseAllSections(
 
 export function parseSnapshotReport(
   aiText: string
-): SnapshotSections | null {
+): SnapshotSectionsV2 | null {
   try {
-    console.log(
-      '[Parser] Snapshot input preview:',
-      aiText.substring(0, 300)
-    )
-
     const keys = [
       'INTRODUCTION',
       'WHY_SEO_MATTERS',
@@ -66,7 +66,7 @@ export function parseSnapshotReport(
 
     const raw = parseAllSections(aiText, keys)
 
-    const sections: SnapshotSections = {
+    const sections: SnapshotSectionsV2 = {
       introduction: raw['INTRODUCTION'] || '',
       whySeoMatters: raw['WHY_SEO_MATTERS'] || '',
       firstImpression: raw['FIRST_IMPRESSION'] || '',
@@ -79,37 +79,19 @@ export function parseSnapshotReport(
       conclusion: raw['CONCLUSION'] || '',
     }
 
-    const hasContent = Object.values(sections)
-      .some(v => v.length > 30)
-
-    if (!hasContent) {
-      console.error('[Parser] Failed — no valid sections extracted. Preview:', aiText?.substring(0, 300))
-      return null
-    }
-
-    console.log(
-      '[Parser] Snapshot keys extracted:',
-      Object.entries(sections)
-        .map(([k, v]) => `${k}:${v.length}`)
-        .join(', ')
-    )
-
+    const hasContent = Object.values(sections).some(v => v.length > 30)
+    if (!hasContent) return null
     return sections
   } catch (err) {
-    console.error('[Parser] Snapshot error:', err)
+    console.error('[ParserV2] Snapshot error:', err)
     return null
   }
 }
 
 export function parseDetailedReport(
   aiText: string
-): DetailedSections | null {
+): DetailedSectionsV2 | null {
   try {
-    console.log(
-      '[Parser] Detailed input preview:',
-      aiText.substring(0, 300)
-    )
-
     const keys = [
       'INTRODUCTION',
       'WHY_SEO_MATTERS',
@@ -127,7 +109,7 @@ export function parseDetailedReport(
 
     const raw = parseAllSections(aiText, keys)
 
-    const sections: DetailedSections = {
+    const sections: DetailedSectionsV2 = {
       introduction: raw['INTRODUCTION'] || '',
       whySeoMatters: raw['WHY_SEO_MATTERS'] || '',
       websitePositioning: raw['WEBSITE_POSITIONING'] || '',
@@ -142,24 +124,11 @@ export function parseDetailedReport(
       conclusion: raw['CONCLUSION'] || '',
     }
 
-    const hasContent = Object.values(sections)
-      .some(v => v.length > 30)
-
-    if (!hasContent) {
-      console.error('[Parser] Failed — no valid sections extracted. Preview:', aiText?.substring(0, 300))
-      return null
-    }
-
-    console.log(
-      '[Parser] Detailed keys extracted:',
-      Object.entries(sections)
-        .map(([k, v]) => `${k}:${v.length}`)
-        .join(', ')
-    )
-
+    const hasContent = Object.values(sections).some(v => v.length > 30)
+    if (!hasContent) return null
     return sections
   } catch (err) {
-    console.error('[Parser] Detailed error:', err)
+    console.error('[ParserV2] Detailed error:', err)
     return null
   }
 }

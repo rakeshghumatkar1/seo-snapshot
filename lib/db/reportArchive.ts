@@ -51,7 +51,11 @@ export async function insertArchivedReport({
   let pdfGeneratedAt: string | null = null
 
   try {
-    const pdf = buildPDFBuffer({ websiteUrl, reportType, sections: sectionsJson })
+    const pdf = buildPDFBuffer({
+      websiteUrl,
+      reportType,
+      sections: sectionsJson as Record<string, unknown>,
+    })
     pdfBase64 = pdf.toString('base64')
     pdfFilename = reportPDFFilename(websiteUrl, reportType)
     pdfGeneratedAt = new Date().toISOString()
@@ -100,7 +104,7 @@ export async function ensureReportPDF(reportId: string) {
     }
   }
 
-  const sections = report.sections_json || {}
+  const sections = (report.sections_json || {}) as Record<string, unknown>
   const pdf = buildPDFBuffer({
     websiteUrl: report.website_url,
     reportType: report.report_type,

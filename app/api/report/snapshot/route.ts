@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     const report = {
       type: 'snapshot' as const,
       websiteUrl: cleanUrl,
+      reportVersion: 3 as const,
       sections: result.sections,
     };
 
@@ -70,7 +71,10 @@ export async function POST(request: NextRequest) {
         reportType: 'snapshot',
         email: undefined,
         status: 'success',
-        sectionsJson: result.sections,
+        sectionsJson: {
+          reportVersion: 3,
+          ...result.sections,
+        },
       });
     } catch (err) {
       console.error('[Snapshot] Report archive failed:', err)

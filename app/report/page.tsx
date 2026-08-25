@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ReportResponse, ReportSections } from '@/types/report';
+import { ReportResponse, detectReportVersion } from '@/types/report';
 import { FeatureConfig } from '@/types/config';
 import ReportHeader from '@/components/report/ReportHeader';
 import ReportSection from '@/components/report/ReportSection';
@@ -10,34 +10,11 @@ import RatingBlock from '@/components/report/RatingBlock';
 import CTABlock from '@/components/report/CTABlock';
 import ServiceHelpCTA from '@/components/public/ServiceHelpCTA';
 import Modal from '@/components/ui/Modal';
+import {
+  getSectionLabel,
+  iterableSectionEntries,
+} from '@/lib/report/sectionLabels';
 
-const SNAPSHOT_SECTION_LABELS: Record<string, { category: string; title: string }> = {
-  introduction: { category: 'OVERVIEW', title: 'Introduction' },
-  whySeoMatters: { category: 'CONTEXT', title: 'Why SEO Matters for This Website' },
-  firstImpression: { category: 'FIRST LOOK', title: 'First Impression of the Website' },
-  contentVisibility: { category: 'CONTENT', title: 'Content & Visibility Observations' },
-  competitorPresence: { category: 'COMPETITION', title: 'Competitor Presence' },
-  keywordOpportunities: { category: 'KEYWORDS', title: 'Keyword & Topic Opportunities' },
-  technicalObservations: { category: 'TECHNICAL', title: 'Technical & Structure Observations' },
-  whatCanBeImproved: { category: 'IMPROVEMENTS', title: 'What Can Be Improved' },
-  nextSteps: { category: 'ACTION', title: 'Next Steps' },
-  conclusion: { category: 'SUMMARY', title: 'Conclusion' },
-};
-
-const DETAILED_SECTION_LABELS: Record<string, { category: string; title: string }> = {
-  introduction: { category: 'OVERVIEW', title: 'Introduction' },
-  whySeoMatters: { category: 'CONTEXT', title: 'Why SEO Matters for This Website' },
-  websitePositioning: { category: 'POSITIONING', title: 'Website Positioning Review' },
-  contentStrategy: { category: 'CONTENT', title: 'Content Strategy Review' },
-  competitorLandscape: { category: 'COMPETITION', title: 'Competitor Landscape' },
-  keywordDirection: { category: 'KEYWORDS', title: 'Keyword Direction & Topic Opportunities' },
-  technicalSignals: { category: 'TECHNICAL', title: 'Site Structure & Technical Signals' },
-  authorityTrust: { category: 'AUTHORITY', title: 'Authority & Trust Signals' },
-  seoRoadmap: { category: 'ROADMAP', title: 'SEO Roadmap' },
-  detailedRecommendations: { category: 'RECOMMENDATIONS', title: 'Detailed Recommendations' },
-  nextSteps: { category: 'ACTION', title: 'Next Steps & Further Analysis' },
-  conclusion: { category: 'SUMMARY', title: 'Conclusion' },
-};
 
 export default function ReportPage() {
   return (
@@ -342,9 +319,10 @@ function ReportContent() {
     );
   }
 
-  const labels = report.type === 'detailed'
-    ? DETAILED_SECTION_LABELS
-    : SNAPSHOT_SECTION_LABELS;
+  const reportVersion = detectReportVersion(
+    report.sections as unknown as Record<string, unknown>,
+    report.reportVersion
+  );
 
   return (
     <div className="public-page-content max-w-3xl mx-auto px-6 py-16">
@@ -358,19 +336,20 @@ function ReportContent() {
       )}
 
       {/* Section Cards */}
-      {Object.entries(report.sections).map(([key, value], index) => {
-        if (!value || (value as string).length < 10) return null;
-        const label = labels[key] || { category: key.toUpperCase(), title: key };
-        return (
-          <div key={key} className={`fade-up delay-${Math.min(index, 7)}`}>
-            <ReportSection
-              category={label.category}
-              title={label.title}
-              content={value as string}
-            />
-          </div>
-        );
-      })}
+      {iterableSectionEntries(report.sections as unknown as Record<string, unknown>).map(
+        ([key, value], index) => {
+          const label = getSectionLabel(key, report.type, reportVersion);
+          return (
+            <div key={key} className={`fade-up delay-${Math.min(index, 7)}`}>
+              <ReportSection
+                category={label.category}
+                title={label.title}
+                content={value}
+              />
+            </div>
+          );
+        }
+      )}
 
       {/* Action Bar */}
       <div className="glass p-6 mt-8 mb-4">
@@ -606,14 +585,14 @@ function ReportContent() {
 
 function DetailedLoadingMessage() {
   const messages = [
-    'Researching your website...',
-    'Analyzing industry positioning...',
-    'Reviewing content strategy...',
-    'Mapping competitive landscape...',
-    'Identifying keyword opportunities...',
-    'Building your SEO roadmap...',
-    'Crafting recommendations...',
-    'Finalizing your report...',
+    'Understanding your business and customer journey...',
+    'Reviewing important service pages...',
+    'Assessing trust and credibility signals...',
+    'Checking search readiness...',
+    'Assessing AI discovery readiness...',
+    'Reviewing enquiry paths...',
+    'Prioritising business opportunities...',
+    'Building your action roadmap...',
   ];
   const [idx, setIdx] = useState(0);
   const [show, setShow] = useState(true);

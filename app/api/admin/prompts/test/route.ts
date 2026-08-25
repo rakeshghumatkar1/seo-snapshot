@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import { generateWithAI } from '@/lib/ai/provider'
-import { fetchWebsiteContent } from '@/lib/ai/fetchWebsite'
+import { buildWebsiteEvidencePackage } from '@/lib/ai/website/buildEvidencePackage'
+import { formatEvidenceForAI } from '@/lib/ai/website/formatEvidenceForAI'
 import { buildSnapshotPrompt } from '@/lib/ai/prompts/snapshotPrompt'
 import { buildDetailedPrompt } from '@/lib/ai/prompts/detailedPrompt'
+
+function extractPreview(text: string, preferredKeys: string[]): string {
+  for (const key of preferredKeys) {
+    const marker = key + ':'
+    const start = text.indexOf(marker)
+    if (start === -1) continue
+    const after = text.slice(start + marker.length)
+    const next = after.match(/\n[A-Z][A-Z_]+:/)
+    return (next ? after.slice(0, next.index) : after).trim()
+  }
+  return text.trim().slice(0, 1200)
+}
 
 export async function POST(req: NextRequest) {
   const auth = await isAdminAuthenticated()
@@ -19,33 +32,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     }
 
-    const websiteContent = await fetchWebsiteContent(url)
-    const pagesFound = 1 + websiteContent.additionalPages.length
+    const isDetailed = key === 'detailed_system_prompt'
+    const evidence = await buildWebsiteEvidencePackage(url, {
+      depth: isDetailed ? 'detailed' : 'snapshot',
+    })
+    const evidenceContext = formatEvidenceForAI(
+      evidence,
+      isDetailed ? 'detailed' : 'snapshot'
+    )
 
-    const contentContext = websiteContent.allText
-      ? `
-WEBSITE RESEARCH DATA:
-Domain: ${websiteContent.domain}
-Pages analyzed: ${pagesFound} page(s) found
-
-${websiteContent.allText}
-
-END OF WEBSITE DATA
-
-Use the above real website content to make your report specific to this business.
-Base all observations on what is actually visible in the content above.
-`
-      : ''
-
-    const prompt =
-      key === 'detailed_system_prompt'
-        ? buildDetailedPrompt(url, contentContext)
-        : buildSnapshotPrompt(url, contentContext)
+    const prompt = isDetailed
+      ? buildDetailedPrompt(url, evidenceContext)
+      : buildSnapshotPrompt(url, evidenceContext)
 
     const result = await generateWithAI({
       prompt,
       systemPrompt: content,
-      reportType: key === 'detailed_system_prompt' ? 'detailed' : 'snapshot',
+      reportType: isDetailed ? 'detailed' : 'snapshot',
     })
 
     if (!result.success || !result.text) {
@@ -55,17 +58,12 @@ Base all observations on what is actually visible in the content above.
       )
     }
 
-    const introStart = result.text.indexOf('INTRODUCTION:')
-    let introduction: string
-    if (introStart !== -1) {
-      const afterIntro = result.text.slice(introStart + 'INTRODUCTION:'.length)
-      const nextSectionMatch = afterIntro.match(/\n[A-Z][A-Z_]+:/)
-      introduction = nextSectionMatch
-        ? afterIntro.slice(0, nextSectionMatch.index).trim()
-        : afterIntro.trim()
-    } else {
-      introduction = result.text.trim()
-    }
+    const introduction = extractPreview(
+      result.text,
+      isDetailed
+        ? ['EXECUTIVE_BUSINESS_ASSESSMENT', 'INTRODUCTION']
+        : ['BUSINESS_CUSTOMER_UNDERSTANDING', 'INTRODUCTION']
+    )
 
     return NextResponse.json({ introduction })
   } catch (err: any) {

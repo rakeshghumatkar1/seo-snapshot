@@ -4,6 +4,10 @@ import {
   normalizeAnonymizedBusinessReferences,
   preferAnonymizedHomepageSamples,
 } from '@/lib/anonymize/normalizeBusinessReferences'
+import {
+  buildCoverageMarkets,
+  type HomepageCoverageMarket,
+} from '@/lib/homepage/coverageMarkets'
 
 let schemaPromise: Promise<void> | null = null
 
@@ -101,19 +105,16 @@ export type ShowcasePublicSample = {
   featured: boolean
 }
 
-export type ShowcaseRecentBusiness = {
-  displayName: string
-  domain: string | null
-}
+export type { HomepageCoverageMarket }
 
 export async function getPublicHomepageShowcase(): Promise<{
   stats: PublicUsageStats
   sampleReports: ShowcasePublicSample[]
-  recentBusinesses: ShowcaseRecentBusiness[]
+  coverageMarkets: HomepageCoverageMarket[]
 }> {
   await ensureHomepageShowcaseSchema()
 
-  const [stats, anonymizedSamples, sourceSamples, recent] = await Promise.all([
+  const [stats, anonymizedSamples, sourceSamples] = await Promise.all([
     getPublicUsageStats(),
     dbQuery(`
       SELECT
@@ -161,18 +162,6 @@ export async function getPublicHomepageShowcase(): Promise<{
       ORDER BY hs.featured DESC, hs.display_order ASC, hs.updated_at DESC
       LIMIT 12
     `),
-    dbQuery(`
-      SELECT
-        hs.public_display_name,
-        CASE WHEN hs.show_domain THEN hs.public_domain ELSE NULL END AS public_domain
-      FROM homepage_showcase hs
-      INNER JOIN reports r ON r.id = hs.report_id
-      WHERE hs.is_active = TRUE
-        AND hs.show_recently_analysed = TRUE
-        AND COALESCE(r.status, 'success') = 'success'
-      ORDER BY hs.display_order ASC, hs.updated_at DESC
-      LIMIT 24
-    `),
   ])
 
   // Prefer published anonymised samples on the homepage; fall back to source samples only if none exist.
@@ -195,10 +184,8 @@ export async function getPublicHomepageShowcase(): Promise<{
         featured: Boolean(row.featured),
       }
     }),
-    recentBusinesses: recent.map((row: any) => ({
-      displayName: row.public_display_name,
-      domain: row.public_domain || null,
-    })),
+    // Coverage is always derived from published anonymised samples only (never source-mode).
+    coverageMarkets: buildCoverageMarkets(anonymizedSamples, 6),
   }
 }
 

@@ -9,9 +9,9 @@ import HomepageUsageStats from '@/components/public/HomepageUsageStats';
 import HomepageSampleReports, {
   type SampleReportCard,
 } from '@/components/public/HomepageSampleReports';
-import HomepageRecentBusinesses, {
-  type RecentBusiness,
-} from '@/components/public/HomepageRecentBusinesses';
+import HomepageReportCoverage, {
+  type HomepageCoverageMarket,
+} from '@/components/public/HomepageReportCoverage';
 
 function isValidInput(url: string): boolean {
   const cleaned = url.trim();
@@ -80,7 +80,7 @@ export default function Home() {
     detailedReportsCreated: 0,
   });
   const [sampleReports, setSampleReports] = useState<SampleReportCard[]>([]);
-  const [recentBusinesses, setRecentBusinesses] = useState<RecentBusiness[]>([]);
+  const [coverageMarkets, setCoverageMarkets] = useState<HomepageCoverageMarket[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,8 +94,8 @@ export default function Home() {
           detailedReportsCreated: Number(data?.stats?.detailedReportsCreated || 0),
         });
         setSampleReports(Array.isArray(data?.sampleReports) ? data.sampleReports : []);
-        setRecentBusinesses(
-          Array.isArray(data?.recentBusinesses) ? data.recentBusinesses : []
+        setCoverageMarkets(
+          Array.isArray(data?.coverageMarkets) ? data.coverageMarkets : []
         );
       })
       .catch(() => {});
@@ -383,7 +383,7 @@ export default function Home() {
       </section>
 
       <HomepageSampleReports samples={sampleReports} />
-      <HomepageRecentBusinesses businesses={recentBusinesses} />
+      <HomepageReportCoverage markets={coverageMarkets} />
 
       <ServiceConversionSection />
     </div>

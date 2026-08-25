@@ -2525,7 +2525,7 @@ body:has(.public-site) .noise-overlay {
 }
 
 .public-samples-intro,
-.public-recent-intro {
+.public-coverage-intro {
   max-width: 36rem;
   margin: 0.75rem auto 0;
   color: var(--tb-ink-500, #64748b);
@@ -2694,47 +2694,74 @@ body:has(.public-site) .noise-overlay {
   text-decoration: underline;
 }
 
-.public-section-recent {
+.public-section-coverage {
   background: #fff;
   border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.public-recent-strip {
+.public-coverage-grid {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 0.85rem;
   justify-content: center;
-  gap: 0.75rem 1rem;
 }
 
-.public-recent-item {
-  display: inline-flex;
+.public-coverage-grid.is-count-1 {
+  grid-template-columns: minmax(0, 16rem);
+  justify-content: center;
+}
+
+.public-coverage-grid.is-count-few {
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 14.5rem));
+  justify-content: center;
+}
+
+.public-coverage-grid.is-count-many {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+  .public-coverage-grid.is-count-many {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.public-coverage-card {
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-  min-width: 7.5rem;
-  padding: 0.85rem 1.1rem;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.95rem 1.1rem;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
 
-.public-recent-name {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+.public-coverage-cue {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #0f172a;
-  text-align: center;
+  color: #64748b;
+  margin-bottom: 0.15rem;
 }
 
-.public-recent-domain {
-  font-size: 0.7rem;
+.public-coverage-category {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.public-coverage-location {
+  font-size: 0.8rem;
   color: #64748b;
-  text-align: center;
+  line-height: 1.35;
 }
 
 .public-site .report-doc-sample-label {

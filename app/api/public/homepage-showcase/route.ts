@@ -23,7 +23,7 @@ export async function GET() {
           detailedReportsCreated: 0,
         },
         sampleReports: [],
-        recentBusinesses: [],
+        coverageMarkets: [],
       },
       { status: 200 }
     )

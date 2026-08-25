@@ -6,7 +6,7 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <div>
+    <div className="admin-shell">
       <AdminQuickNav />
       {children}
     </div>

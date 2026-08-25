@@ -484,12 +484,13 @@ export default function AdminDashboard() {
         top: 0,
         left: 0,
         height: '100vh',
-        background: 'rgba(0,0,0,0.45)',
+        background: '#ffffff',
         borderRight: '1px solid var(--glass-border)',
         display: 'flex',
         flexDirection: 'column',
         zIndex: 100,
         overflowY: 'auto',
+        boxShadow: '1px 0 0 rgba(15,23,42,0.02)',
       }}>
         {/* Brand */}
         <div style={{ padding: '24px 20px 18px' }}>
@@ -521,10 +522,10 @@ export default function AdminDashboard() {
                   width: '100%',
                   textAlign: 'left',
                   padding: '10px 20px',
-                  background: isActive ? 'rgba(16,185,129,0.1)' : 'transparent',
+                  background: isActive ? 'rgba(15,118,110,0.1)' : 'transparent',
                   border: 'none',
-                  boxShadow: isActive ? 'inset 3px 0 0 #10b981' : 'inset 3px 0 0 transparent',
-                  color: isActive ? '#34d399' : 'var(--t-300)',
+                  boxShadow: isActive ? 'inset 3px 0 0 #0f766e' : 'inset 3px 0 0 transparent',
+                  color: isActive ? '#0f766e' : 'var(--t-300)',
                   fontSize: '13px',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -533,7 +534,7 @@ export default function AdminDashboard() {
                   display: 'block',
                 }}
                 onMouseEnter={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
+                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(15,23,42,0.04)'
                 }}
                 onMouseLeave={e => {
                   if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'

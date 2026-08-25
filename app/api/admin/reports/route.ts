@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import { ensureReportArchiveSchema } from '@/lib/db/reportArchive'
+import { ensureHomepageShowcaseSchema } from '@/lib/db/homepageShowcase'
 import { dbQuery } from '@/lib/db/client'
+import {
+  dateFilterCutoffUtc,
+  parseDateFilter,
+  parseLimit,
+  parsePdfFilter,
+  parseReportTypeFilter,
+  parseSampleFilter,
+  parseSortPreset,
+  sampleStatusSqlCase,
+  sortPresetToSql,
+} from '@/lib/admin/reportFilters'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const SORT_COLUMNS: Record<string, string> = {
-  created_at: 'created_at',
-  website_url: 'website_url',
-  report_type: 'report_type',
-  email: 'email',
-  status: 'status',
-}
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthenticated())) {
@@ -19,33 +23,74 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await ensureReportArchiveSchema()
+    await Promise.all([ensureReportArchiveSchema(), ensureHomepageShowcaseSchema()])
 
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
+    const limit = parseLimit(searchParams.get('limit'))
     const offset = (page - 1) * limit
     const query = (searchParams.get('q') || '').trim()
-    const type = searchParams.get('type') || 'all'
-    const sortColumn = SORT_COLUMNS[searchParams.get('sort') || 'created_at'] || 'created_at'
-    const sortDirection = searchParams.get('dir') === 'asc' ? 'ASC' : 'DESC'
+    const type = parseReportTypeFilter(searchParams.get('type'))
+    const pdf = parsePdfFilter(searchParams.get('pdf'))
+    const sample = parseSampleFilter(searchParams.get('sample'))
+    const date = parseDateFilter(searchParams.get('date'))
+    const sortPreset = parseSortPreset(searchParams.get('sort'))
+    const { column: sortColumn, direction: sortDirection } = sortPresetToSql(sortPreset)
 
     const clauses: string[] = []
     const params: any[] = []
 
     if (type === 'snapshot' || type === 'detailed') {
       params.push(type)
-      clauses.push(`report_type = $${params.length}`)
+      clauses.push(`r.report_type = $${params.length}`)
+    }
+
+    if (pdf === 'stored') {
+      clauses.push(`r.pdf_base64 IS NOT NULL`)
+    } else if (pdf === 'missing') {
+      clauses.push(`r.pdf_base64 IS NULL`)
+    }
+
+    if (sample === 'published') {
+      clauses.push(`(
+        hs.sample_content_mode = 'anonymized'
+        AND hs.anonymization_status = 'published'
+        AND hs.use_as_sample = TRUE
+      )`)
+    } else if (sample === 'draft') {
+      clauses.push(`(
+        (
+          hs.anonymized_sections_json IS NOT NULL
+          OR hs.sample_content_mode = 'anonymized'
+        )
+        AND NOT (
+          hs.sample_content_mode = 'anonymized'
+          AND hs.anonymization_status = 'published'
+          AND hs.use_as_sample = TRUE
+        )
+      )`)
+    } else if (sample === 'none') {
+      clauses.push(`(
+        hs.id IS NULL
+        OR (
+          COALESCE(hs.sample_content_mode, 'source') <> 'anonymized'
+          AND hs.anonymized_sections_json IS NULL
+        )
+      )`)
+    }
+
+    const cutoff = dateFilterCutoffUtc(date)
+    if (cutoff) {
+      params.push(cutoff.toISOString())
+      clauses.push(`r.created_at >= $${params.length}::timestamptz`)
     }
 
     if (query) {
       params.push(`%${query}%`)
       const p = `$${params.length}`
       clauses.push(`(
-        COALESCE(website_url, '') ILIKE ${p} OR
-        COALESCE(email, '') ILIKE ${p} OR
-        COALESCE(report_type, '') ILIKE ${p} OR
-        COALESCE(status, '') ILIKE ${p}
+        COALESCE(r.website_url, '') ILIKE ${p} OR
+        COALESCE(r.email, '') ILIKE ${p}
       )`)
     }
 
@@ -53,27 +98,37 @@ export async function GET(req: NextRequest) {
     const rowParams = [...params, limit, offset]
     const limitParam = `$${params.length + 1}`
     const offsetParam = `$${params.length + 2}`
+    const sampleStatusExpr = sampleStatusSqlCase()
+
+    const fromJoin = `
+      FROM reports r
+      LEFT JOIN homepage_showcase hs ON hs.report_id = r.id
+    `
 
     const [rows, countRows, summaryRows] = await Promise.all([
       dbQuery(
         `SELECT
-          id,
-          website_url,
-          report_type,
-          email,
-          status,
-          sections_json,
-          created_at,
-          pdf_filename,
-          pdf_generated_at,
-          (pdf_base64 IS NOT NULL) AS has_pdf
-         FROM reports
+          r.id,
+          r.website_url,
+          r.report_type,
+          r.email,
+          r.status,
+          r.sections_json,
+          r.created_at,
+          r.pdf_filename,
+          r.pdf_generated_at,
+          (r.pdf_base64 IS NOT NULL) AS has_pdf,
+          hs.sample_content_mode,
+          hs.anonymization_status,
+          hs.use_as_sample,
+          (${sampleStatusExpr}) AS sample_status
+         ${fromJoin}
          ${where}
-         ORDER BY ${sortColumn} ${sortDirection} NULLS LAST, created_at DESC
+         ORDER BY ${sortColumn} ${sortDirection} NULLS LAST, r.created_at DESC
          LIMIT ${limitParam} OFFSET ${offsetParam}`,
         rowParams
       ),
-      dbQuery(`SELECT COUNT(*) AS total FROM reports ${where}`, params),
+      dbQuery(`SELECT COUNT(*) AS total ${fromJoin} ${where}`, params),
       dbQuery(`
         SELECT
           COUNT(*) AS total,
@@ -91,13 +146,14 @@ export async function GET(req: NextRequest) {
       total,
       page,
       limit,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
+      totalPages: Math.max(1, Math.ceil(total / limit) || 1),
       summary: {
         total: Number(summaryRows[0]?.total || 0),
         snapshot: Number(summaryRows[0]?.snapshot || 0),
         detailed: Number(summaryRows[0]?.detailed || 0),
         pdfCount: Number(summaryRows[0]?.pdf_count || 0),
       },
+      filters: { type, pdf, sample, date, sort: sortPreset, q: query, limit },
     })
   } catch (err) {
     console.error('[Admin/reports GET]', err)
@@ -113,7 +169,9 @@ export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json()
     const ids = Array.isArray(body.ids)
-      ? body.ids.filter((id: unknown): id is string => typeof id === 'string' && UUID_RE.test(id)).slice(0, 100)
+      ? body.ids
+          .filter((id: unknown): id is string => typeof id === 'string' && UUID_RE.test(id))
+          .slice(0, 100)
       : []
 
     if (!ids.length) {

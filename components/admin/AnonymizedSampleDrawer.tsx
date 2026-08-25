@@ -43,7 +43,7 @@ const controlStyle: React.CSSProperties = {
   padding: '9px 11px',
   borderRadius: '8px',
   border: '1px solid var(--glass-border)',
-  background: 'rgba(255,255,255,0.04)',
+  background: 'var(--glass-1)',
   color: 'var(--t-100)',
   fontSize: '12px',
   outline: 'none',
@@ -432,11 +432,12 @@ export default function AnonymizedSampleDrawer({
 
   return (
     <div
+      className="admin-drawer-backdrop"
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 290,
-        background: 'rgba(0,0,0,0.76)',
+        background: 'rgba(15, 23, 42, 0.45)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -444,14 +445,15 @@ export default function AnonymizedSampleDrawer({
       }}
     >
       <div
+        className="admin-drawer-surface"
         style={{
           width: '100%',
           maxWidth: '920px',
           maxHeight: '92vh',
           borderRadius: '12px',
           border: '1px solid var(--glass-border)',
-          background: '#0f1117',
-          boxShadow: '0 24px 70px rgba(0,0,0,0.45)',
+          background: 'var(--glass-2)',
+          boxShadow: '0 24px 70px rgba(15,23,42,0.18)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',

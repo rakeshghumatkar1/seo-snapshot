@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -10,9 +10,22 @@ import {
   iterableSectionEntries,
 } from '@/lib/report/sectionLabels'
 import AnonymizedSampleDrawer from '@/components/admin/AnonymizedSampleDrawer'
-
-type ReportType = 'all' | 'snapshot' | 'detailed'
-type SortDirection = 'asc' | 'desc'
+import type {
+  DateFilter,
+  PdfFilter,
+  ReportTypeFilter,
+  SampleFilter,
+  SampleStatus,
+  SortPreset,
+} from '@/lib/admin/reportFilters'
+import {
+  parseDateFilter,
+  parseLimit,
+  parsePdfFilter,
+  parseReportTypeFilter,
+  parseSampleFilter,
+  parseSortPreset,
+} from '@/lib/admin/reportFilters'
 
 interface ReportRow {
   id: string
@@ -25,6 +38,7 @@ interface ReportRow {
   pdf_filename: string | null
   pdf_generated_at: string | null
   has_pdf: boolean
+  sample_status?: SampleStatus | string | null
 }
 
 interface Summary {
@@ -47,52 +61,95 @@ function formatDate(value: string) {
   })
 }
 
+function hostFromUrl(url: string) {
+  return url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+}
+
+function sampleBadge(status: string | null | undefined) {
+  const value = String(status || 'none')
+  if (value === 'published') return { label: 'Published', className: 'admin-badge admin-badge-success' }
+  if (value === 'needs_review') return { label: 'Needs Review', className: 'admin-badge admin-badge-warn' }
+  if (value === 'failed') return { label: 'Failed', className: 'admin-badge admin-badge-danger' }
+  if (value === 'draft') return { label: 'Draft', className: 'admin-badge admin-badge-info' }
+  return { label: 'None', className: 'admin-badge admin-badge-muted' }
+}
+
 export default function ReportsLibraryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const [rows, setRows] = useState<ReportRow[]>([])
   const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1))
   const [totalPages, setTotalPages] = useState(1)
   const [totalRows, setTotalRows] = useState(0)
-  const [query, setQuery] = useState(searchParams.get('q') || '')
-  const [type, setType] = useState<ReportType>('all')
-  const [sort, setSort] = useState('created_at')
-  const [direction, setDirection] = useState<SortDirection>('desc')
+  const [limit, setLimit] = useState(() => parseLimit(searchParams.get('limit')))
+  const [query, setQuery] = useState(() => searchParams.get('q') || '')
+  const [type, setType] = useState<ReportTypeFilter>(() => parseReportTypeFilter(searchParams.get('type')))
+  const [pdf, setPdf] = useState<PdfFilter>(() => parsePdfFilter(searchParams.get('pdf')))
+  const [sample, setSample] = useState<SampleFilter>(() => parseSampleFilter(searchParams.get('sample')))
+  const [date, setDate] = useState<DateFilter>(() => parseDateFilter(searchParams.get('date')))
+  const [sort, setSort] = useState<SortPreset>(() => parseSortPreset(searchParams.get('sort')))
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successNote, setSuccessNote] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [viewing, setViewing] = useState<ReportRow | null>(null)
-  const [showcaseReport, setShowcaseReport] = useState<ReportRow | null>(null)
-  const [showcaseLoading, setShowcaseLoading] = useState(false)
-  const [showcaseSaving, setShowcaseSaving] = useState(false)
-  const [showcaseError, setShowcaseError] = useState<string | null>(null)
-  const [showcaseForm, setShowcaseForm] = useState({
-    isActive: false,
-    useAsSample: false,
-    showRecentlyAnalysed: false,
-    showDomain: false,
-    featured: false,
-    displayOrder: 0,
-    publicDisplayName: '',
-    publicDomain: '',
-    businessCategory: '',
-    slug: '',
-  })
   const [anonymizeReport, setAnonymizeReport] = useState<ReportRow | null>(null)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [openPdfId, setOpenPdfId] = useState<string | null>(null)
+  const headerCheckboxRef = useRef<HTMLInputElement>(null)
+
+  const filtersActive =
+    Boolean(query.trim()) ||
+    type !== 'all' ||
+    pdf !== 'all' ||
+    sample !== 'all' ||
+    date !== 'all' ||
+    sort !== 'newest' ||
+    limit !== 20
+
+  const syncUrl = useCallback(
+    (next: {
+      page: number
+      limit: number
+      q: string
+      type: ReportTypeFilter
+      pdf: PdfFilter
+      sample: SampleFilter
+      date: DateFilter
+      sort: SortPreset
+    }) => {
+      const params = new URLSearchParams()
+      if (next.q.trim()) params.set('q', next.q.trim())
+      if (next.type !== 'all') params.set('type', next.type)
+      if (next.pdf !== 'all') params.set('pdf', next.pdf)
+      if (next.sample !== 'all') params.set('sample', next.sample)
+      if (next.date !== 'all') params.set('date', next.date)
+      if (next.sort !== 'newest') params.set('sort', next.sort)
+      if (next.limit !== 20) params.set('limit', String(next.limit))
+      if (next.page > 1) params.set('page', String(next.page))
+      const qs = params.toString()
+      router.replace(qs ? `/admin/dashboard/reports?${qs}` : '/admin/dashboard/reports')
+    },
+    [router]
+  )
 
   const loadReports = useCallback(async () => {
     setLoading(true)
     setError(null)
-
     try {
       const params = new URLSearchParams({
         page: String(page),
-        limit: '20',
+        limit: String(limit),
         q: query,
         type,
+        pdf,
+        sample,
+        date,
         sort,
-        dir: direction,
       })
       const res = await fetch(`/api/admin/reports?${params.toString()}`, { cache: 'no-store' })
       if (res.status === 401) {
@@ -102,449 +159,611 @@ export default function ReportsLibraryPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to load reports')
 
+      const nextTotalPages = Math.max(1, Number(data.totalPages || 1))
+      if (page > nextTotalPages) {
+        setPage(nextTotalPages)
+        return
+      }
+
       setRows(data.rows || [])
       setSummary(data.summary || EMPTY_SUMMARY)
       setTotalRows(Number(data.total || 0))
-      setTotalPages(Math.max(1, Number(data.totalPages || 1)))
+      setTotalPages(nextTotalPages)
+      syncUrl({ page, limit, q: query, type, pdf, sample, date, sort })
     } catch (err: any) {
       setError(err?.message || 'Failed to load reports')
     } finally {
       setLoading(false)
     }
-  }, [direction, page, query, router, sort, type])
+  }, [date, limit, page, pdf, query, router, sample, sort, syncUrl, type])
 
   useEffect(() => {
     const timer = setTimeout(loadReports, 250)
     return () => clearTimeout(timer)
   }, [loadReports])
 
-  async function deleteReport(report: ReportRow) {
-    if (!window.confirm(`Delete the saved ${report.report_type} report for ${report.website_url}? This cannot be undone.`)) return
+  useEffect(() => {
+    setSelected(new Set())
+    setOpenMenuId(null)
+    setOpenPdfId(null)
+  }, [page, type, pdf, sample, date, sort, limit, query])
+
+  useEffect(() => {
+    if (!successNote) return
+    const timer = setTimeout(() => setSuccessNote(null), 3500)
+    return () => clearTimeout(timer)
+  }, [successNote])
+
+  const allVisibleSelected = useMemo(
+    () => rows.length > 0 && rows.every((row) => selected.has(row.id)),
+    [rows, selected]
+  )
+  const someVisibleSelected = useMemo(
+    () => rows.some((row) => selected.has(row.id)) && !allVisibleSelected,
+    [rows, selected, allVisibleSelected]
+  )
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someVisibleSelected
+    }
+  }, [someVisibleSelected])
+
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleVisible() {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) rows.forEach((row) => next.delete(row.id))
+      else rows.forEach((row) => next.add(row.id))
+      return next
+    })
+  }
+
+  function clearFilters() {
+    setQuery('')
+    setType('all')
+    setPdf('all')
+    setSample('all')
+    setDate('all')
+    setSort('newest')
+    setLimit(20)
+    setPage(1)
+    setSelected(new Set())
+  }
+
+  async function deleteIds(ids: string[]) {
+    if (!ids.length || actionLoading) return
     setActionLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/admin/reports', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [report.id] }),
+        body: JSON.stringify({ ids }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to delete report')
-      await loadReports()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete reports')
+      const deleted = Number(data.deleted || ids.length)
+      setSuccessNote(`${deleted} report${deleted === 1 ? '' : 's'} deleted.`)
+      setSelected(new Set())
+      setConfirmBulkDelete(false)
+      setOpenMenuId(null)
+      if (rows.length === ids.length && page > 1) {
+        setPage((p) => Math.max(1, p - 1))
+      } else {
+        await loadReports()
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to delete report')
+      setError(err?.message || 'Failed to delete reports')
     } finally {
       setActionLoading(false)
     }
   }
 
-  async function openShowcase(report: ReportRow) {
-    setShowcaseReport(report)
-    setShowcaseError(null)
-    setShowcaseLoading(true)
-    const host = report.website_url
-      .replace(/^https?:\/\//i, '')
-      .replace(/^www\./i, '')
-      .split('/')[0] || ''
-    setShowcaseForm({
-      isActive: false,
-      useAsSample: false,
-      showRecentlyAnalysed: false,
-      showDomain: false,
-      featured: false,
-      displayOrder: 0,
-      publicDisplayName: '',
-      publicDomain: host,
-      businessCategory: '',
-      slug: '',
-    })
-    try {
-      const res = await fetch(`/api/admin/showcase?reportId=${encodeURIComponent(report.id)}`, {
-        cache: 'no-store',
-      })
-      if (res.status === 401) {
-        router.push('/admin')
-        return
-      }
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to load showcase settings')
-      const sc = data.showcase
-      if (sc) {
-        setShowcaseForm({
-          isActive: Boolean(sc.is_active),
-          useAsSample: Boolean(sc.use_as_sample),
-          showRecentlyAnalysed: Boolean(sc.show_recently_analysed),
-          showDomain: Boolean(sc.show_domain),
-          featured: Boolean(sc.featured),
-          displayOrder: Number(sc.display_order || 0),
-          publicDisplayName: String(sc.public_display_name || ''),
-          publicDomain: String(sc.public_domain || host),
-          businessCategory: String(sc.business_category || ''),
-          slug: String(sc.slug || ''),
-        })
-      }
-    } catch (err: any) {
-      setShowcaseError(err?.message || 'Failed to load showcase settings')
-    } finally {
-      setShowcaseLoading(false)
+  async function deleteSingle(report: ReportRow) {
+    if (
+      !window.confirm(
+        `Delete the saved ${report.report_type} report for ${hostFromUrl(report.website_url)}? This cannot be undone.`
+      )
+    ) {
+      return
     }
-  }
-
-  async function saveShowcase() {
-    if (!showcaseReport) return
-    setShowcaseSaving(true)
-    setShowcaseError(null)
-    try {
-      const res = await fetch('/api/admin/showcase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reportId: showcaseReport.id,
-          isActive: showcaseForm.isActive,
-          useAsSample: showcaseForm.useAsSample,
-          showRecentlyAnalysed: showcaseForm.showRecentlyAnalysed,
-          showDomain: showcaseForm.showDomain,
-          featured: showcaseForm.featured,
-          displayOrder: showcaseForm.displayOrder,
-          publicDisplayName: showcaseForm.publicDisplayName,
-          publicDomain: showcaseForm.publicDomain,
-          businessCategory: showcaseForm.businessCategory,
-          slug: showcaseForm.slug,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to save showcase settings')
-      if (data.showcase?.slug) {
-        setShowcaseForm((prev) => ({ ...prev, slug: data.showcase.slug }))
-      }
-      setShowcaseReport(null)
-    } catch (err: any) {
-      setShowcaseError(err?.message || 'Failed to save showcase settings')
-    } finally {
-      setShowcaseSaving(false)
-    }
-  }
-
-  const controlStyle: React.CSSProperties = {
-    padding: '9px 11px',
-    borderRadius: '8px',
-    border: '1px solid var(--glass-border)',
-    background: 'rgba(255,255,255,0.04)',
-    color: 'var(--t-100)',
-    fontSize: '12px',
-    outline: 'none',
-  }
-
-  const thStyle: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '10px 12px',
-    borderBottom: '1px solid var(--glass-border)',
-    color: 'var(--t-300)',
-    fontWeight: 700,
-    fontSize: '10px',
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    whiteSpace: 'nowrap',
-  }
-
-  const tdStyle: React.CSSProperties = {
-    padding: '11px 12px',
-    color: 'var(--t-200)',
-    fontSize: '12px',
-    verticalAlign: 'middle',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    await deleteIds([report.id])
   }
 
   return (
-    <main style={{ minHeight: '100vh', padding: '58px 28px 40px', maxWidth: '1500px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+    <main className="admin-page">
+      <div className="admin-page-header">
         <div>
-          <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', color: '#34d399', marginBottom: '7px' }}>ADMIN · REPORTS</div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '26px', fontWeight: 800, color: 'var(--t-100)', margin: 0 }}>Reports Library</h1>
-          <div style={{ color: 'var(--t-400)', fontSize: '13px', marginTop: '7px' }}>
-            Review every saved Snapshot and Detailed report, open the report content, and view or download its PDF.
-          </div>
+          <div className="admin-eyebrow">ADMIN · REPORTS</div>
+          <h1 className="admin-title">Reports Library</h1>
+          <p className="admin-subtitle">
+            Manage archived reports, open content or PDFs, and publish anonymised homepage samples.
+          </p>
         </div>
-        <Link href="/admin/dashboard" className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: '12px' }}>← Dashboard</Link>
+        <Link href="/admin/dashboard" className="admin-btn admin-btn-secondary">
+          ← Dashboard
+        </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '14px', marginBottom: '20px' }}>
+      <div className="admin-summary-grid">
         {[
-          { label: 'All Reports', value: summary.total, color: '#6366f1' },
-          { label: 'Snapshot', value: summary.snapshot, color: '#10b981' },
-          { label: 'Detailed', value: summary.detailed, color: '#f59e0b' },
-          { label: 'PDFs Stored', value: summary.pdfCount, color: '#3b82f6' },
-        ].map(card => (
-          <div key={card.label} className="glass" style={{ padding: '18px 20px' }}>
-            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--t-400)', marginBottom: '7px' }}>{card.label}</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '27px', fontWeight: 800, color: card.color }}>{card.value}</div>
-          </div>
+          {
+            label: 'All Reports',
+            value: summary.total,
+            onClick: () => {
+              setType('all')
+              setPdf('all')
+              setPage(1)
+            },
+          },
+          {
+            label: 'Snapshot',
+            value: summary.snapshot,
+            onClick: () => {
+              setType('snapshot')
+              setPage(1)
+            },
+          },
+          {
+            label: 'Detailed',
+            value: summary.detailed,
+            onClick: () => {
+              setType('detailed')
+              setPage(1)
+            },
+          },
+          {
+            label: 'PDFs Stored',
+            value: summary.pdfCount,
+            onClick: () => {
+              setPdf('stored')
+              setPage(1)
+            },
+          },
+        ].map((card) => (
+          <button key={card.label} type="button" className="admin-summary-card" onClick={card.onClick}>
+            <span className="admin-summary-label">{card.label}</span>
+            <span className="admin-summary-value">{card.value}</span>
+          </button>
         ))}
       </div>
 
-      <div className="glass" style={{ padding: '18px', marginBottom: '18px' }}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="admin-panel admin-filters">
+        <div className="admin-filter-row">
           <input
+            className="admin-input admin-input-search"
             value={query}
-            onChange={e => { setQuery(e.target.value); setPage(1) }}
-            placeholder="Search website, email, status or report type..."
-            style={{ ...controlStyle, flex: '1 1 280px', minWidth: '220px' }}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Search website or email…"
           />
-          <select value={type} onChange={e => { setType(e.target.value as ReportType); setPage(1) }} style={controlStyle}>
-            <option value="all">All report types</option>
-            <option value="snapshot">Snapshot only</option>
-            <option value="detailed">Detailed only</option>
-          </select>
-          <select value={sort} onChange={e => { setSort(e.target.value); setPage(1) }} style={controlStyle}>
-            <option value="created_at">Sort: Date</option>
-            <option value="website_url">Sort: Website</option>
-            <option value="report_type">Sort: Report Type</option>
-            <option value="email">Sort: Email</option>
-            <option value="status">Sort: Status</option>
-          </select>
-          <button onClick={() => setDirection(d => d === 'asc' ? 'desc' : 'asc')} className="btn btn-secondary" style={{ fontSize: '12px', padding: '9px 13px' }}>
-            {direction === 'asc' ? '↑ Ascending' : '↓ Descending'}
-          </button>
+        </div>
+        <div className="admin-filter-row admin-filter-row-wrap">
+          <label className="admin-field">
+            <span>Report Type</span>
+            <select
+              className="admin-input"
+              value={type}
+              onChange={(e) => {
+                setType(parseReportTypeFilter(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="all">All</option>
+              <option value="snapshot">Snapshot</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>PDF</span>
+            <select
+              className="admin-input"
+              value={pdf}
+              onChange={(e) => {
+                setPdf(parsePdfFilter(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="all">All</option>
+              <option value="stored">Stored</option>
+              <option value="missing">Missing</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Sample Status</span>
+            <select
+              className="admin-input"
+              value={sample}
+              onChange={(e) => {
+                setSample(parseSampleFilter(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="all">All</option>
+              <option value="published">Published Sample</option>
+              <option value="draft">Draft Sample</option>
+              <option value="none">No Sample</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Date</span>
+            <select
+              className="admin-input"
+              value={date}
+              onChange={(e) => {
+                setDate(parseDateFilter(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Sort</span>
+            <select
+              className="admin-input"
+              value={sort}
+              onChange={(e) => {
+                setSort(parseSortPreset(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="website_asc">Website A–Z</option>
+              <option value="website_desc">Website Z–A</option>
+              <option value="type">Snapshot / Detailed</option>
+              <option value="pdf">PDF Status</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Rows</span>
+            <select
+              className="admin-input"
+              value={String(limit)}
+              onChange={(e) => {
+                setLimit(parseLimit(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          {filtersActive ? (
+            <button type="button" className="admin-btn admin-btn-ghost" onClick={clearFilters}>
+              Clear Filters
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {error && (
-        <div style={{ padding: '11px 14px', marginBottom: '16px', borderRadius: '8px', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: '12px', fontWeight: 600 }}>{error}</div>
-      )}
+      {error ? <div className="admin-alert admin-alert-error">{error}</div> : null}
+      {successNote ? <div className="admin-alert admin-alert-success">{successNote}</div> : null}
 
-      <div className="glass" style={{ padding: '18px' }}>
-        <div style={{ color: 'var(--t-400)', fontSize: '12px', marginBottom: '12px' }}>{totalRows} matching reports · Page {page} of {totalPages}</div>
+      {selected.size > 0 ? (
+        <div className="admin-bulk-bar">
+          <span className="admin-bulk-count">{selected.size} selected</span>
+          <div className="admin-bulk-actions">
+            <button
+              type="button"
+              className="admin-btn admin-btn-danger"
+              disabled={actionLoading}
+              onClick={() => setConfirmBulkDelete(true)}
+            >
+              Delete Selected
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-ghost"
+              onClick={() => setSelected(new Set())}
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="admin-panel">
+        <div className="admin-table-meta">
+          {totalRows} matching reports · Page {page} of {totalPages}
+        </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '54px' }}><div className="loader" style={{ margin: '0 auto' }} /></div>
+          <div className="admin-empty">
+            <div className="loader" />
+          </div>
         ) : rows.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '54px', color: 'var(--t-400)', fontSize: '13px' }}>No reports match these filters.</div>
+          <div className="admin-empty">No reports match these filters.</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
               <thead>
                 <tr>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Website</th>
-                  <th style={thStyle}>Type</th>
-                  <th style={thStyle}>Email</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>PDF</th>
-                  <th style={thStyle}>Actions</th>
+                  <th className="admin-th-check">
+                    <input
+                      ref={headerCheckboxRef}
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleVisible}
+                      aria-label="Select all visible reports"
+                    />
+                  </th>
+                  <th>Date</th>
+                  <th>Website</th>
+                  <th>Type</th>
+                  <th>Email</th>
+                  <th>PDF</th>
+                  <th>Sample</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(row => (
-                  <tr key={row.id}>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--t-400)' }}>{formatDate(row.created_at)}</td>
-                    <td style={{ ...tdStyle, maxWidth: '260px' }}>
-                      <a href={row.website_url} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>
-                        {row.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                      </a>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: '100px', fontSize: '10px', fontWeight: 800, color: row.report_type === 'detailed' ? '#f59e0b' : '#34d399', background: row.report_type === 'detailed' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)' }}>{row.report_type.toUpperCase()}</span>
-                    </td>
-                    <td style={tdStyle}>{row.email || '—'}</td>
-                    <td style={tdStyle}>{row.status || '—'}</td>
-                    <td style={tdStyle}>
-                      <span style={{ color: row.has_pdf ? '#34d399' : '#f59e0b', fontSize: '11px', fontWeight: 700 }}>{row.has_pdf ? 'Stored' : 'Create on open'}</span>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
-                        <button className="btn btn-secondary" onClick={() => setViewing(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>View Report</button>
-                        <button className="btn btn-secondary" onClick={() => openShowcase(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>Homepage Showcase</button>
-                        <button className="btn btn-secondary" onClick={() => setAnonymizeReport(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>Anonymised Sample</button>
-                        <a href={`/api/admin/reports/${row.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ fontSize: '10px', padding: '5px 9px', textDecoration: 'none' }}>View PDF</a>
-                        <a href={`/api/admin/reports/${row.id}/pdf?download=1`} className="btn btn-secondary" style={{ fontSize: '10px', padding: '5px 9px', textDecoration: 'none' }}>Download</a>
-                        <button disabled={actionLoading} onClick={() => deleteReport(row)} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.28)', background: 'transparent', color: '#f87171', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const sampleInfo = sampleBadge(row.sample_status)
+                  const isSelected = selected.has(row.id)
+                  const nonSuccess = row.status && row.status !== 'success'
+                  return (
+                    <tr key={row.id} className={isSelected ? 'is-selected' : undefined}>
+                      <td className="admin-td-check">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRow(row.id)}
+                          aria-label={`Select ${hostFromUrl(row.website_url)}`}
+                        />
+                      </td>
+                      <td className="admin-td-muted admin-td-nowrap">
+                        {formatDate(row.created_at)}
+                        {nonSuccess ? (
+                          <span className="admin-badge admin-badge-warn" style={{ marginLeft: 6 }}>
+                            {row.status}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="admin-td-website">
+                        <a href={row.website_url} target="_blank" rel="noreferrer">
+                          {hostFromUrl(row.website_url)}
+                        </a>
+                      </td>
+                      <td>
+                        <span
+                          className={`admin-badge ${
+                            row.report_type === 'detailed' ? 'admin-badge-warn' : 'admin-badge-success'
+                          }`}
+                        >
+                          {row.report_type}
+                        </span>
+                      </td>
+                      <td>{row.email || '—'}</td>
+                      <td>
+                        <span
+                          className={`admin-badge ${
+                            row.has_pdf ? 'admin-badge-success' : 'admin-badge-muted'
+                          }`}
+                        >
+                          {row.has_pdf ? 'Stored' : 'Missing'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={sampleInfo.className}>{sampleInfo.label}</span>
+                      </td>
+                      <td>
+                        <div className="admin-row-actions">
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn-secondary admin-btn-sm"
+                            title="View report"
+                            onClick={() => setViewing(row)}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn-secondary admin-btn-sm"
+                            title="Anonymised Sample"
+                            onClick={() => setAnonymizeReport(row)}
+                          >
+                            Sample
+                          </button>
+                          <div className="admin-menu">
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                              title="PDF actions"
+                              onClick={() => {
+                                setOpenPdfId((id) => (id === row.id ? null : row.id))
+                                setOpenMenuId(null)
+                              }}
+                            >
+                              PDF ▾
+                            </button>
+                            {openPdfId === row.id ? (
+                              <div className="admin-menu-panel">
+                                <a
+                                  href={`/api/admin/reports/${row.id}/pdf`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={() => setOpenPdfId(null)}
+                                >
+                                  View PDF
+                                </a>
+                                <a
+                                  href={`/api/admin/reports/${row.id}/pdf?download=1`}
+                                  onClick={() => setOpenPdfId(null)}
+                                >
+                                  Download PDF
+                                </a>
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="admin-menu">
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-ghost admin-btn-sm"
+                              title="More actions"
+                              onClick={() => {
+                                setOpenMenuId((id) => (id === row.id ? null : row.id))
+                                setOpenPdfId(null)
+                              }}
+                            >
+                              ⋯
+                            </button>
+                            {openMenuId === row.id ? (
+                              <div className="admin-menu-panel">
+                                <button
+                                  type="button"
+                                  className="admin-menu-danger"
+                                  disabled={actionLoading}
+                                  onClick={() => deleteSingle(row)}
+                                >
+                                  Delete Report
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
 
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px' }}>
-            <button className="btn btn-ghost" disabled={page === 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ fontSize: '12px' }}>← Prev</button>
-            <span style={{ color: 'var(--t-400)', fontSize: '12px' }}>{page} / {totalPages}</span>
-            <button className="btn btn-ghost" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ fontSize: '12px' }}>Next →</button>
-          </div>
-        )}
+        <div className="admin-pagination">
+          <button
+            type="button"
+            className="admin-btn admin-btn-ghost"
+            disabled={page === 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </button>
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            className="admin-btn admin-btn-ghost"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next
+          </button>
+        </div>
       </div>
 
-      {viewing && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 270, background: 'rgba(0,0,0,0.76)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '900px', maxHeight: '88vh', borderRadius: '12px', border: '1px solid var(--glass-border)', background: '#0f1117', boxShadow: '0 24px 70px rgba(0,0,0,0.45)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)' }}>
+      {viewing ? (
+        <div className="admin-modal-backdrop" onClick={() => setViewing(null)}>
+          <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
               <div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--t-100)', fontSize: '16px' }}>{viewing.website_url}</div>
-                <div style={{ fontSize: '11px', color: 'var(--t-400)', marginTop: '3px' }}>{viewing.report_type.toUpperCase()} · {formatDate(viewing.created_at)}</div>
+                <div className="admin-modal-title">{viewing.website_url}</div>
+                <div className="admin-modal-meta">
+                  {viewing.report_type.toUpperCase()} · {formatDate(viewing.created_at)}
+                </div>
               </div>
-              <button onClick={() => setViewing(null)} style={{ background: 'none', border: 'none', color: 'var(--t-400)', fontSize: '22px', cursor: 'pointer' }}>×</button>
+              <button type="button" className="admin-modal-close" onClick={() => setViewing(null)}>
+                ×
+              </button>
             </div>
-
-            <div style={{ padding: '22px', overflowY: 'auto' }}>
+            <div className="admin-modal-body">
               {iterableSectionEntries(viewing.sections_json || {}).map(([key, value]) => {
                 const reportType = viewing.report_type === 'detailed' ? 'detailed' : 'snapshot'
                 const version = detectReportVersion(viewing.sections_json || {})
                 const label = getSectionLabel(key, reportType, version)
                 return (
-                  <div key={key} style={{ marginBottom: '18px', padding: '16px 18px', border: '1px solid var(--glass-border)', borderLeft: '3px solid #10b981', borderRadius: '8px', background: 'rgba(255,255,255,0.025)' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--t-400)', marginBottom: '4px' }}>{label.category}</div>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--t-100)', marginBottom: '8px' }}>{label.title}</div>
-                    <div style={{ whiteSpace: 'pre-wrap', color: 'var(--t-300)', fontSize: '12px', lineHeight: 1.7 }}>{value}</div>
+                  <div key={key} className="admin-section-card">
+                    <div className="admin-section-category">{label.category}</div>
+                    <div className="admin-section-title">{label.title}</div>
+                    <div className="admin-section-body">{value}</div>
                   </div>
                 )
               })}
             </div>
-
-            <div style={{ padding: '14px 22px 18px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--glass-border)' }}>
-              <a href={`/api/admin/reports/${viewing.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: '12px' }}>View PDF</a>
-              <a href={`/api/admin/reports/${viewing.id}/pdf?download=1`} className="btn btn-primary" style={{ textDecoration: 'none', fontSize: '12px' }}>Download PDF</a>
+            <div className="admin-modal-footer">
+              <a
+                href={`/api/admin/reports/${viewing.id}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="admin-btn admin-btn-secondary"
+              >
+                View PDF
+              </a>
+              <a
+                href={`/api/admin/reports/${viewing.id}/pdf?download=1`}
+                className="admin-btn admin-btn-primary"
+              >
+                Download PDF
+              </a>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {showcaseReport && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 280, background: 'rgba(0,0,0,0.76)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '560px', maxHeight: '90vh', borderRadius: '12px', border: '1px solid var(--glass-border)', background: '#0f1117', boxShadow: '0 24px 70px rgba(0,0,0,0.45)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)' }}>
-              <div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--t-100)', fontSize: '16px' }}>Homepage Showcase</div>
-                <div style={{ fontSize: '11px', color: 'var(--t-400)', marginTop: '3px' }}>
-                  {showcaseReport.report_type.toUpperCase()} · {showcaseReport.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                </div>
-              </div>
-              <button onClick={() => setShowcaseReport(null)} style={{ background: 'none', border: 'none', color: 'var(--t-400)', fontSize: '22px', cursor: 'pointer' }}>×</button>
+      {confirmBulkDelete ? (
+        <div className="admin-modal-backdrop" onClick={() => !actionLoading && setConfirmBulkDelete(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div className="admin-modal-title">Delete {selected.size} selected reports?</div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                disabled={actionLoading}
+                onClick={() => setConfirmBulkDelete(false)}
+              >
+                ×
+              </button>
             </div>
-
-            <div style={{ padding: '20px 22px', overflowY: 'auto' }}>
-              <p style={{ fontSize: '12px', color: 'var(--t-400)', lineHeight: 1.55, marginBottom: '16px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                Only the public display information and approved report content will be visible. Lead name/email and internal metadata are never published. For privacy-safe generic samples, use Anonymised Sample instead.
+            <div className="admin-modal-body">
+              <p>
+                This permanently removes the archived report and its linked showcase/sample data where
+                ON DELETE CASCADE applies.
               </p>
-
-              {showcaseLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}><div className="loader" style={{ margin: '0 auto' }} /></div>
-              ) : (
-                <div style={{ display: 'grid', gap: '12px' }}>
-                  {[
-                    { key: 'isActive', label: 'Publish / active on homepage' },
-                    { key: 'useAsSample', label: 'Use as Sample Report' },
-                    { key: 'showRecentlyAnalysed', label: 'Show in Recently Analysed' },
-                    { key: 'showDomain', label: 'Show public domain' },
-                    { key: 'featured', label: 'Featured (sort first)' },
-                  ].map((item) => (
-                    <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--t-200)', fontSize: '13px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean((showcaseForm as any)[item.key])}
-                        onChange={(e) =>
-                          setShowcaseForm((prev) => ({ ...prev, [item.key]: e.target.checked }))
-                        }
-                      />
-                      {item.label}
-                    </label>
-                  ))}
-
-                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    Public Display Name
-                    <input
-                      value={showcaseForm.publicDisplayName}
-                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, publicDisplayName: e.target.value }))}
-                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
-                      placeholder="e.g. Think Big Digital"
-                    />
-                  </label>
-
-                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    Public Domain
-                    <input
-                      value={showcaseForm.publicDomain}
-                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, publicDomain: e.target.value }))}
-                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
-                      placeholder="thinkbigdigital.co"
-                    />
-                  </label>
-
-                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    Business Category
-                    <input
-                      value={showcaseForm.businessCategory}
-                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, businessCategory: e.target.value }))}
-                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
-                      placeholder="e.g. Digital Marketing"
-                    />
-                  </label>
-
-                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    Public Slug
-                    <input
-                      value={showcaseForm.slug}
-                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, slug: e.target.value }))}
-                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
-                      placeholder="think-big-digital-seo-growth"
-                    />
-                  </label>
-
-                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    Display Order
-                    <input
-                      type="number"
-                      min={0}
-                      max={9999}
-                      value={showcaseForm.displayOrder}
-                      onChange={(e) =>
-                        setShowcaseForm((prev) => ({
-                          ...prev,
-                          displayOrder: Number(e.target.value || 0),
-                        }))
-                      }
-                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal', width: '120px' }}
-                    />
-                  </label>
-
-                  {showcaseForm.slug && showcaseForm.isActive && showcaseForm.useAsSample && (
-                    <a
-                      href={`/sample-report/${encodeURIComponent(showcaseForm.slug)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-secondary"
-                      style={{ textDecoration: 'none', fontSize: '12px', justifySelf: 'start' }}
-                    >
-                      Preview Public Version →
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {showcaseError && (
-                <div style={{ marginTop: '14px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: '12px', fontWeight: 600 }}>
-                  {showcaseError}
-                </div>
-              )}
+              <p className="admin-danger-text">This cannot be undone.</p>
             </div>
-
-            <div style={{ padding: '14px 22px 18px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--glass-border)' }}>
-              <button className="btn btn-secondary" onClick={() => setShowcaseReport(null)} style={{ fontSize: '12px' }}>Cancel</button>
-              <button className="btn btn-primary" disabled={showcaseLoading || showcaseSaving} onClick={saveShowcase} style={{ fontSize: '12px' }}>
-                {showcaseSaving ? 'Saving…' : 'Save Showcase'}
+            <div className="admin-modal-footer">
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary"
+                disabled={actionLoading}
+                onClick={() => setConfirmBulkDelete(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                disabled={actionLoading}
+                onClick={() => deleteIds(Array.from(selected))}
+              >
+                {actionLoading ? 'Deleting…' : `Delete ${selected.size} Reports`}
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {anonymizeReport && (
-        <AnonymizedSampleDrawer
-          report={anonymizeReport}
-          onClose={() => setAnonymizeReport(null)}
-        />
-      )}
+      {anonymizeReport ? (
+        <AnonymizedSampleDrawer report={anonymizeReport} onClose={() => setAnonymizeReport(null)} />
+      ) : null}
     </main>
   )
 }

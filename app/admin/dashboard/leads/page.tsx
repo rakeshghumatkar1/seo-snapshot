@@ -185,7 +185,7 @@ export default function LeadManagerPage() {
     padding: '9px 11px',
     borderRadius: '8px',
     border: '1px solid var(--glass-border)',
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--glass-1)',
     color: 'var(--t-100)',
     fontSize: '12px',
     outline: 'none',
@@ -212,7 +212,7 @@ export default function LeadManagerPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', padding: '42px 28px 40px', maxWidth: '1500px', margin: '0 auto' }}>
+    <main className="admin-page" style={{ paddingTop: 42 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '22px', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', color: '#34d399', marginBottom: '7px' }}>

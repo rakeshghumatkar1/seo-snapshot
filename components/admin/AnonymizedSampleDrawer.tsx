@@ -769,11 +769,15 @@ export default function AnonymizedSampleDrawer({
             flexWrap: 'wrap',
           }}
         >
-          {!hasDraft ? (
+          {loading ? (
+            <button className="btn btn-secondary" disabled style={actionBtn}>
+              Loading…
+            </button>
+          ) : !hasDraft ? (
             <>
               <button
                 className="btn btn-primary"
-                disabled={busy || loading}
+                disabled={busy}
                 onClick={generateSample}
                 style={actionBtn}
               >
@@ -787,7 +791,7 @@ export default function AnonymizedSampleDrawer({
             <>
               <button
                 className="btn btn-primary"
-                disabled={busy || loading || !canPublish}
+                disabled={busy || !canPublish}
                 onClick={publishToHomepage}
                 style={actionBtn}
                 title={!canPublish ? 'Privacy must pass before publish' : 'Publish to homepage'}
@@ -810,7 +814,7 @@ export default function AnonymizedSampleDrawer({
               </a>
               <button
                 className="btn btn-secondary"
-                disabled={busy || loading}
+                disabled={busy}
                 onClick={generateSample}
                 style={actionBtn}
               >

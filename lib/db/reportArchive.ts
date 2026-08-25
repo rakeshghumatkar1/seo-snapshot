@@ -1,5 +1,7 @@
 import { dbQuery } from './client'
-import { buildPDFBuffer, reportPDFFilename } from '@/lib/pdf/generateBinaryPDF'
+import { buildCanonicalReportPdf, reportPDFFilename } from '@/lib/pdf/buildCanonicalReportPdf'
+import { buildPDFBuffer } from '@/lib/pdf/generateBinaryPDF'
+import { detectReportVersion } from '@/types/report'
 
 let schemaPromise: Promise<void> | null = null
 
@@ -31,6 +33,40 @@ export async function ensureReportArchiveSchema(): Promise<void> {
   return schemaPromise
 }
 
+async function generateArchivePdfBytes({
+  websiteUrl,
+  reportType,
+  sections,
+}: {
+  websiteUrl: string
+  reportType: string
+  sections: Record<string, unknown>
+}): Promise<{ bytes: Buffer; filename: string }> {
+  const type = reportType === 'detailed' ? 'detailed' : 'snapshot'
+  const version = detectReportVersion(sections)
+
+  // New V3 reports use the unified HTML→PDF presentation.
+  if (version === 3) {
+    const pdf = await buildCanonicalReportPdf({
+      websiteUrl,
+      reportType: type,
+      sections,
+      reportVersion: 3,
+    })
+    return { bytes: pdf.bytes, filename: pdf.filename }
+  }
+
+  // Legacy V2 archives only — keep prior binary generator.
+  return {
+    bytes: buildPDFBuffer({
+      websiteUrl,
+      reportType: type,
+      sections,
+    }),
+    filename: reportPDFFilename(websiteUrl, type),
+  }
+}
+
 export async function insertArchivedReport({
   websiteUrl,
   reportType,
@@ -43,7 +79,7 @@ export async function insertArchivedReport({
   email?: string
   status: string
   sectionsJson: object
-}) {
+}): Promise<string | null> {
   await ensureReportArchiveSchema()
 
   let pdfBase64: string | null = null
@@ -51,13 +87,13 @@ export async function insertArchivedReport({
   let pdfGeneratedAt: string | null = null
 
   try {
-    const pdf = buildPDFBuffer({
+    const pdf = await generateArchivePdfBytes({
       websiteUrl,
       reportType,
       sections: sectionsJson as Record<string, unknown>,
     })
-    pdfBase64 = pdf.toString('base64')
-    pdfFilename = reportPDFFilename(websiteUrl, reportType)
+    pdfBase64 = pdf.bytes.toString('base64')
+    pdfFilename = pdf.filename
     pdfGeneratedAt = new Date().toISOString()
   } catch (err) {
     console.error('[Report Archive] PDF generation failed:', err)
@@ -105,13 +141,12 @@ export async function ensureReportPDF(reportId: string) {
   }
 
   const sections = (report.sections_json || {}) as Record<string, unknown>
-  const pdf = buildPDFBuffer({
+  const pdf = await generateArchivePdfBytes({
     websiteUrl: report.website_url,
     reportType: report.report_type,
     sections,
   })
-  const filename = reportPDFFilename(report.website_url, report.report_type)
-  const base64 = pdf.toString('base64')
+  const base64 = pdf.bytes.toString('base64')
 
   await dbQuery(
     `UPDATE reports
@@ -119,8 +154,12 @@ export async function ensureReportPDF(reportId: string) {
          pdf_filename = $2,
          pdf_generated_at = NOW()
      WHERE id = $3`,
-    [base64, filename, reportId]
+    [base64, pdf.filename, reportId]
   )
 
-  return { bytes: pdf, filename }
+  return { bytes: pdf.bytes, filename: pdf.filename }
+}
+
+export async function getArchivedReportPdf(reportId: string) {
+  return ensureReportPDF(reportId)
 }

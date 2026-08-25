@@ -4,6 +4,9 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/rateLimit/getIp';
 import { insertArchivedReport } from '@/lib/db/reportArchive';
 
+export const maxDuration = 120
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
     console.log('[Snapshot Route] Called')
@@ -56,17 +59,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const report = {
-      type: 'snapshot' as const,
-      websiteUrl: cleanUrl,
-      reportVersion: 3 as const,
-      sections: result.sections,
-    };
-
-    // Finish archiving before responding so the report and PDF are not lost
-    // when the serverless request ends.
+    let archiveId: string | null = null
     try {
-      await insertArchivedReport({
+      archiveId = await insertArchivedReport({
         websiteUrl: cleanUrl,
         reportType: 'snapshot',
         email: undefined,
@@ -80,7 +75,13 @@ export async function POST(request: NextRequest) {
       console.error('[Snapshot] Report archive failed:', err)
     }
 
-    return NextResponse.json(report);
+    return NextResponse.json({
+      type: 'snapshot' as const,
+      websiteUrl: cleanUrl,
+      reportVersion: 3 as const,
+      sections: result.sections,
+      archiveId: archiveId || undefined,
+    });
   } catch (error) {
     console.error('Error generating snapshot report:', error);
     return NextResponse.json(

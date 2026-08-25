@@ -2121,12 +2121,6 @@ body:has(.public-site) .noise-overlay {
   margin-bottom: 1.15rem;
 }
 
-.public-site .report-doc-logo {
-  height: 52px !important;
-  width: auto !important;
-  max-width: 64px;
-}
-
 .public-site .report-doc-brand-text {
   flex: 1;
   min-width: 0;
@@ -2136,9 +2130,10 @@ body:has(.public-site) .noise-overlay {
   margin: 0;
   font-family: var(--font-display);
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--tb-navy-900);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .public-site .report-doc-tagline {
@@ -2437,11 +2432,6 @@ body:has(.public-site) .noise-overlay {
 
   .public-site .report-doc-header-brand {
     flex-wrap: wrap;
-  }
-
-  .public-site .report-doc-logo {
-    height: 44px !important;
-    max-width: 56px;
   }
 
   .public-site .report-doc-meta {

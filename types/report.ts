@@ -47,6 +47,8 @@ export interface ReportResponse {
   websiteUrl: string
   sections: ReportSections
   reportVersion?: 2 | 3
+  /** Archived report id — used so user PDF download serves the same stored artifact. */
+  archiveId?: string
 }
 
 export function isSnapshotV3Sections(sections: Record<string, unknown>): boolean {

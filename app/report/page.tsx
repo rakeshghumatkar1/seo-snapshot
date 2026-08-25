@@ -176,8 +176,12 @@ function ReportContent() {
           name: finalName || undefined,
           company: finalCompany || undefined,
           websiteUrl: report.websiteUrl,
-          sections: report.sections,
+          sections: {
+            reportVersion: report.reportVersion,
+            ...report.sections,
+          },
           reportType: report.type,
+          archiveId: report.archiveId,
         }),
       });
 
@@ -187,32 +191,23 @@ function ReportContent() {
         return;
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/pdf')) {
         setModalError('PDF generation failed. Please try again.');
         return;
       }
 
-      // Open print dialog — works on all browsers
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(data.html);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 800);
-      } else {
-        // Fallback: download as HTML file
-        const blob = new Blob([data.html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = data.filename || 'seo-report.html';
-        a.click();
-        URL.revokeObjectURL(url);
-      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const disposition = response.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      a.href = url;
+      a.download = match?.[1] || `seo-${report.type}-report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
 
       setShowEmailModal(false);
       setEmail('');

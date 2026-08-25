@@ -35,7 +35,7 @@ export function displayDomain(websiteUrl: string): string {
     .replace(/\/$/, '')
 }
 
-export const REPORT_TAGLINE = 'Search • AI Discovery • Trust • Enquiry'
+export const REPORT_TAGLINE = 'Search | AI Discovery | Trust | Enquiry'
 
 export const REPORT_CONTACT = {
   brand: BRAND_NAME,

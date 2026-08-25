@@ -254,6 +254,7 @@ export function buildPDFBuffer(data: {
   reportType: string
   sections: ReportSections
 }): Buffer {
+  // Legacy V2 coordinate PDF only. New V3 reports use buildCanonicalReportPdf.
   const pages = splitPages(buildLines(data))
   const objects: string[] = []
 

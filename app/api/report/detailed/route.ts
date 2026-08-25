@@ -5,6 +5,9 @@ import { getClientIp } from '@/lib/rateLimit/getIp';
 import { getConfig } from '@/lib/db/schema';
 import { insertArchivedReport } from '@/lib/db/reportArchive';
 
+export const maxDuration = 120
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
@@ -61,17 +64,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const report = {
-      type: 'detailed' as const,
-      websiteUrl: cleanUrl,
-      reportVersion: 3 as const,
-      sections: result.sections,
-    };
-
-    // Finish archiving before responding so the report and PDF are not lost
-    // when the serverless request ends.
+    let archiveId: string | null = null
     try {
-      await insertArchivedReport({
+      archiveId = await insertArchivedReport({
         websiteUrl: cleanUrl,
         reportType: 'detailed',
         email,
@@ -85,7 +80,13 @@ export async function POST(request: NextRequest) {
       console.error('[Detailed] Report archive failed:', err)
     }
 
-    return NextResponse.json(report);
+    return NextResponse.json({
+      type: 'detailed' as const,
+      websiteUrl: cleanUrl,
+      reportVersion: 3 as const,
+      sections: result.sections,
+      archiveId: archiveId || undefined,
+    });
   } catch (error) {
     console.error('Error generating detailed report:', error);
     return NextResponse.json(

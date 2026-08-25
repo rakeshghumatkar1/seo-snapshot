@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import { ensureReportPDF } from '@/lib/db/reportArchive'
 
+export const maxDuration = 60
+export const runtime = 'nodejs'
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export async function GET(

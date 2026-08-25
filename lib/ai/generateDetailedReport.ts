@@ -40,8 +40,8 @@ export async function generateDetailedReport(
 } | null> {
   console.log('[Detailed] Building V3 evidence package:', websiteUrl)
 
-  const evidence = await buildWebsiteEvidencePackage(websiteUrl, { depth: 'detailed' })
-  console.log('[Detailed] Pages reviewed:', evidence.analysisCoverage.pagesReviewed)
+  const evidence = await buildWebsiteEvidencePackage(websiteUrl)
+  console.log('[Detailed] Pages analysed:', evidence.coverage.analysedPages)
 
   const evidenceContext = formatEvidenceForAI(evidence, 'detailed')
   const prompt = buildDetailedPrompt(websiteUrl, evidenceContext)

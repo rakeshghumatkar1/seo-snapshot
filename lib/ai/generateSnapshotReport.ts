@@ -40,8 +40,8 @@ export async function generateSnapshotReport(
 } | null> {
   console.log('[Snapshot] Building V3 evidence package:', websiteUrl)
 
-  const evidence = await buildWebsiteEvidencePackage(websiteUrl, { depth: 'snapshot' })
-  console.log('[Snapshot] Pages reviewed:', evidence.analysisCoverage.pagesReviewed)
+  const evidence = await buildWebsiteEvidencePackage(websiteUrl)
+  console.log('[Snapshot] Pages analysed:', evidence.coverage.analysedPages)
 
   const evidenceContext = formatEvidenceForAI(evidence, 'snapshot')
   const prompt = buildSnapshotPrompt(websiteUrl, evidenceContext)

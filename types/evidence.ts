@@ -1,112 +1,147 @@
-export type EvidenceClass =
-  | 'OBSERVED_WEBSITE'
-  | 'OBSERVED_EXTERNAL'
-  | 'INFERRED'
-  | 'NOT_VERIFIED'
+﻿export type EvidenceStatus = 'found' | 'not_observed' | 'verified_unavailable'
 
-export type PageTypeHint =
+export type EvidenceSource = 'website' | 'external'
+
+export type PageType =
   | 'homepage'
   | 'about'
   | 'service'
   | 'product'
-  | 'team'
-  | 'founder'
-  | 'case_study'
+  | 'solution'
+  | 'case-study'
   | 'testimonial'
+  | 'team'
+  | 'author'
   | 'contact'
-  | 'content'
   | 'location'
   | 'pricing'
+  | 'resource'
+  | 'blog'
+  | 'faq'
   | 'other'
 
-export interface SiteWideEvidence {
-  robotsTxtFound: boolean
-  robotsTxtSummary: string
-  sitemapFound: boolean
-  sitemapSummary: string
-  oaiSearchBotAccess: 'allowed' | 'disallowed' | 'not_specified' | 'unknown'
-  homepageHttpStatus: number | null
-  finalUrl: string
+export interface EvidenceRef {
+  source: EvidenceSource
+  url: string
+  label?: string
+}
+
+export interface SiteDirectiveEvidence {
+  robotsTxt: {
+    status: EvidenceStatus
+    url: string
+    httpStatus?: number
+    googlebotAllowed?: boolean
+    oaiSearchBotAllowed?: boolean
+    rawExcerpt?: string
+  }
+  sitemap: {
+    status: EvidenceStatus
+    urls: string[]
+    discoveredFrom?: 'robots' | 'common_path'
+  }
   https: boolean
-  redirectObserved: boolean
-  metaRobots: string[]
-  xRobotsTag: string | null
-  siteCanonical: string | null
+}
+
+export interface StructuredDataEvidence {
+  types: string[]
+  organizationNames: string[]
+}
+
+export interface ConversionEvidence {
+  forms: Array<{
+    action?: string
+    method?: string
+    sourceUrl: string
+  }>
+  phoneLinks: Array<{ value: string; sourceUrl: string }>
+  emailLinks: Array<{ value: string; sourceUrl: string }>
+  ctas: Array<{
+    text: string
+    href?: string
+    sourceUrl: string
+  }>
+}
+
+export interface TrustEvidence {
+  aboutPage: EvidenceRef[]
+  founderTeam: EvidenceRef[]
+  namedExperts: string[]
+  authors: string[]
+  testimonials: EvidenceRef[]
+  caseStudies: EvidenceRef[]
+  certifications: Array<{ text: string; sourceUrl: string }>
+  clientProof: Array<{ text: string; sourceUrl: string }>
+  contactTransparency: EvidenceRef[]
+}
+
+export interface BusinessEvidence {
+  possibleBusinessNames: string[]
+  servicePages: EvidenceRef[]
+  productPages: EvidenceRef[]
+  solutionPages: EvidenceRef[]
+  locationPages: EvidenceRef[]
+  pricingPages: EvidenceRef[]
+  contactPages: EvidenceRef[]
 }
 
 export interface PageEvidence {
-  url: string
-  pageType: PageTypeHint
-  httpStatus: number | null
+  requestedUrl: string
+  finalUrl: string
+  pageType: PageType
+  selectionReason: string
+  httpStatus: number
+  fetchMode: 'html'
   title: string
   metaDescription: string
-  h1: string[]
-  h2: string[]
-  h3: string[]
-  visibleBodyText: string
-  canonical: string | null
-  robotsDirectives: string[]
-  internalLinks: string[]
-  structuredDataTypes: string[]
-  author: string | null
-  publishedOrUpdated: string | null
-  ctaEvidence: string[]
-  trustEvidence: string[]
-  businessServiceLocationEvidence: string[]
-}
-
-export interface TrustEvidenceSummary {
-  aboutSignals: string[]
-  founderSignals: string[]
-  teamSignals: string[]
-  namedExperts: string[]
-  authorshipSignals: string[]
-  credentials: string[]
-  certifications: string[]
-  testimonials: string[]
-  caseStudies: string[]
-  clientEvidence: string[]
-  awards: string[]
-  originalResearch: string[]
-  methodologyProcess: string[]
-  contactTransparency: string[]
-  policies: string[]
-}
-
-export interface EnquiryEvidenceSummary {
-  forms: string[]
-  telLinks: string[]
-  emailLinks: string[]
-  bookingSignals: string[]
-  demoSignals: string[]
-  quoteSignals: string[]
-  enquirySignals: string[]
-  purchaseSignals: string[]
-  ctaWording: string[]
-  ctaDestinations: string[]
-}
-
-export interface ExternalEvidence {
-  collected: false
-  status: 'NOT_VERIFIED'
-  note: string
+  canonical: string
+  metaRobots: string
+  xRobotsTag: string
+  headings: string[]
+  visibleText: string
+  internalLinks: Array<{ href: string; text: string }>
+  structuredData: StructuredDataEvidence
+  authorNames: string[]
+  publishedDate: string
+  modifiedDate: string
+  conversionSignals: ConversionEvidence
+  trustSignals: {
+    testimonialMentions: string[]
+    caseStudyMentions: string[]
+    certificationMentions: string[]
+    clientProofMentions: string[]
+  }
+  error?: string
 }
 
 export interface AnalysisCoverage {
-  pagesRequested: number
-  pagesReviewed: number
-  pageUrls: string[]
-  selectionNotes: string
-  method: 'html_fetch'
+  websiteUrl: string
+  analysedAt: string
+  discoveredInternalUrls: number
+  analysedPages: number
+  pages: Array<{
+    url: string
+    pageType: PageType
+    selectionReason: string
+    status: 'analysed' | 'failed'
+  }>
+  renderedFallbackUsed: boolean
+}
+
+export interface ExternalEvidencePlaceholder {
+  status: 'not_collected'
+  note: string
 }
 
 export interface WebsiteEvidencePackage {
+  version: 3
   domain: string
-  analysedAt: string
-  analysisCoverage: AnalysisCoverage
-  siteWide: SiteWideEvidence
+  coverage: AnalysisCoverage
+  siteDirectives: SiteDirectiveEvidence
+  businessEvidence: BusinessEvidence
+  trustEvidence: TrustEvidence
+  conversionEvidence: ConversionEvidence
   pages: PageEvidence[]
-  trust: TrustEvidenceSummary
-  enquiry: EnquiryEvidenceSummary
-  externalEvidence: ExternalEvidence
+  externalEvidence: ExternalEvidencePlaceholder
+  limitations: string[]
 }

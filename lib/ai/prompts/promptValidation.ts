@@ -1,14 +1,20 @@
-import {
-  DETAILED_V3_DB_MARKERS,
-  SNAPSHOT_V3_DB_MARKERS,
-} from '@/types/reportV3'
-
 export function isValidSnapshotV3Prompt(content: string): boolean {
   const text = content || ''
-  return SNAPSHOT_V3_DB_MARKERS.every(marker => text.includes(marker))
+  return [
+    'BUSINESS_CUSTOMER_UNDERSTANDING:',
+    'SEARCH_OPPORTUNITY:',
+    'AI_DISCOVERY_READINESS:',
+    'TOP_PRIORITY_ACTIONS:',
+  ].every(marker => text.includes(marker))
 }
 
 export function isValidDetailedV3Prompt(content: string): boolean {
   const text = content || ''
-  return DETAILED_V3_DB_MARKERS.every(marker => text.includes(marker))
+  return [
+    'EXECUTIVE_BUSINESS_ASSESSMENT:',
+    'SEARCH_AS_GROWTH_CHANNEL:',
+    'AI_DISCOVERY_READINESS:',
+    'PRIORITY_INVESTMENT_PLAN:',
+    'ACTION_ROADMAP:',
+  ].every(marker => text.includes(marker))
 }

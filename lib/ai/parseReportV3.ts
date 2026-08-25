@@ -1,117 +1,104 @@
-import type { DetailedSections, SnapshotSections } from '@/types/report'
-import {
-  DETAILED_V3_FIELD_MAP,
-  DETAILED_V3_KEYS,
-  SNAPSHOT_V3_FIELD_MAP,
-  SNAPSHOT_V3_KEYS,
-} from '@/types/reportV3'
+﻿import { DetailedSectionsV3, SnapshotSectionsV3 } from '@/types/reportV3'
 
-function parseAllSections(text: string, keys: readonly string[]): Record<string, string> {
-  const result: Record<string, string> = {}
+type SnapshotKey = keyof SnapshotSectionsV3
+type DetailedKey = keyof DetailedSectionsV3
 
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i]
-    const nextKey = keys[i + 1]
-    const keyWithColon = key + ':'
-    const keyIndex = text.indexOf(keyWithColon)
+const SNAPSHOT_KEYS: Array<[string, SnapshotKey]> = [
+  ['BUSINESS_CUSTOMER_UNDERSTANDING:', 'businessCustomerUnderstanding'],
+  ['SEARCH_OPPORTUNITY:', 'searchOpportunity'],
+  ['WEBSITE_OFFER_CLARITY:', 'websiteOfferClarity'],
+  ['TRUST_REPUTATION:', 'trustReputation'],
+  ['TRADITIONAL_SEARCH_READINESS:', 'traditionalSearchReadiness'],
+  ['AI_DISCOVERY_READINESS:', 'aiDiscoveryReadiness'],
+  ['CUSTOMER_CONTENT_OPPORTUNITIES:', 'customerContentOpportunities'],
+  ['ENQUIRY_READINESS:', 'enquiryReadiness'],
+  ['TOP_PRIORITY_ACTIONS:', 'topPriorityActions'],
+  ['LIMITS_NEXT_STEP:', 'limitsNextStep'],
+]
 
-    if (keyIndex === -1) {
-      console.warn('[ParserV3] Key not found:', key)
-      result[key] = ''
-      continue
-    }
+const DETAILED_KEYS: Array<[string, DetailedKey]> = [
+  ['EXECUTIVE_BUSINESS_ASSESSMENT:', 'executiveBusinessAssessment'],
+  ['SEARCH_AS_GROWTH_CHANNEL:', 'searchAsGrowthChannel'],
+  ['CUSTOMER_INTENT_DISCOVERY:', 'customerIntentDiscovery'],
+  ['POSITIONING_OFFER_CLARITY:', 'positioningOfferClarity'],
+  ['COMMERCIAL_PAGE_READINESS:', 'commercialPageReadiness'],
+  ['CONTENT_INFORMATION_ASSETS:', 'contentInformationAssets'],
+  ['AUTHORITY_REPUTATION_TRUST:', 'authorityReputationTrust'],
+  ['TRADITIONAL_SEARCH_READINESS:', 'traditionalSearchReadiness'],
+  ['AI_DISCOVERY_READINESS:', 'aiDiscoveryReadiness'],
+  ['LOCAL_SEARCH_READINESS:', 'localSearchReadiness'],
+  ['COMPETITIVE_SEARCH_EVIDENCE:', 'competitiveSearchEvidence'],
+  ['CONVERSION_ENQUIRY_READINESS:', 'conversionEnquiryReadiness'],
+  ['MEASUREMENT_LIMITATIONS:', 'measurementLimitations'],
+  ['PRIORITY_INVESTMENT_PLAN:', 'priorityInvestmentPlan'],
+  ['ACTION_ROADMAP:', 'actionRoadmap'],
+  ['EVIDENCE_LIMITATIONS:', 'evidenceLimitations'],
+]
 
-    const contentStart = keyIndex + keyWithColon.length
-    const nextKeyIndex = nextKey ? text.indexOf(nextKey + ':', contentStart) : -1
-    const contentEnd = nextKeyIndex > contentStart ? nextKeyIndex : text.length
+function extractSections<T extends string>(raw: string, keys: Array<[string, T]>): Record<T, string> {
+  const result = {} as Record<T, string>
+  const positions = keys
+    .map(([marker, key]) => ({ marker, key, index: raw.indexOf(marker) }))
+    .filter(item => item.index >= 0)
+    .sort((a, b) => a.index - b.index)
 
-    result[key] = text
-      .substring(contentStart, contentEnd)
-      .trim()
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
+  for (let i = 0; i < positions.length; i++) {
+    const current = positions[i]
+    const next = positions[i + 1]
+    const start = current.index + current.marker.length
+    const end = next ? next.index : raw.length
+    result[current.key] = raw.slice(start, end).trim()
+  }
+
+  for (const [, key] of keys) {
+    if (!(key in result)) result[key] = ''
   }
 
   return result
 }
 
-function assertRequiredContent(
+function hasEnoughContent(
   sections: Record<string, string>,
   minFilled: number,
   minChars: number
 ): boolean {
-  const filled = Object.values(sections).filter(v => v.length >= minChars)
-  if (filled.length < minFilled) {
-    console.error(
-      `[ParserV3] Insufficient sections: ${filled.length}/${minFilled} with >= ${minChars} chars`
-    )
-    return false
-  }
-  return true
+  const filled = Object.values(sections).filter(value => value.length >= minChars)
+  return filled.length >= minFilled
 }
 
-export function parseSnapshotReportV3(aiText: string): SnapshotSections | null {
-  try {
-    console.log('[ParserV3] Snapshot preview:', aiText.substring(0, 300))
-    const raw = parseAllSections(aiText, SNAPSHOT_V3_KEYS)
+export function parseSnapshotReportV3(raw: string): SnapshotSectionsV3 | null {
+  const sections = extractSections(raw, SNAPSHOT_KEYS) as SnapshotSectionsV3
+  const missing = SNAPSHOT_KEYS.filter(([, key]) => !sections[key]).map(([marker]) => marker)
 
-    const sections = {} as SnapshotSections
-    for (const key of SNAPSHOT_V3_KEYS) {
-      sections[SNAPSHOT_V3_FIELD_MAP[key]] = raw[key] || ''
-    }
-
-    const missing = SNAPSHOT_V3_KEYS.filter(k => !(raw[k] && raw[k].length > 0))
-    if (missing.length > 0) {
-      console.error('[ParserV3] Snapshot missing markers:', missing.join(', '))
-      return null
-    }
-
-    if (!assertRequiredContent(sections as unknown as Record<string, string>, 8, 40)) {
-      return null
-    }
-
-    console.log(
-      '[ParserV3] Snapshot ok:',
-      Object.entries(sections)
-        .map(([k, v]) => `${k}:${v.length}`)
-        .join(', ')
-    )
-    return sections
-  } catch (err) {
-    console.error('[ParserV3] Snapshot error:', err)
+  if (missing.length > 0) {
+    console.error('[ParserV3] Snapshot missing markers:', missing.join(', '))
     return null
   }
-}
 
-export function parseDetailedReportV3(aiText: string): DetailedSections | null {
-  try {
-    console.log('[ParserV3] Detailed preview:', aiText.substring(0, 300))
-    const raw = parseAllSections(aiText, DETAILED_V3_KEYS)
-
-    const sections = {} as DetailedSections
-    for (const key of DETAILED_V3_KEYS) {
-      sections[DETAILED_V3_FIELD_MAP[key]] = raw[key] || ''
-    }
-
-    const missing = DETAILED_V3_KEYS.filter(k => !(raw[k] && raw[k].length > 0))
-    if (missing.length > 0) {
-      console.error('[ParserV3] Detailed missing markers:', missing.join(', '))
-      return null
-    }
-
-    if (!assertRequiredContent(sections as unknown as Record<string, string>, 12, 40)) {
-      return null
-    }
-
-    console.log(
-      '[ParserV3] Detailed ok:',
-      Object.entries(sections)
-        .map(([k, v]) => `${k}:${v.length}`)
-        .join(', ')
-    )
-    return sections
-  } catch (err) {
-    console.error('[ParserV3] Detailed error:', err)
+  if (!hasEnoughContent(sections as unknown as Record<string, string>, 8, 40)) {
+    console.error('[ParserV3] Snapshot content insufficient')
     return null
   }
+
+  return sections
 }
+
+export function parseDetailedReportV3(raw: string): DetailedSectionsV3 | null {
+  const sections = extractSections(raw, DETAILED_KEYS) as DetailedSectionsV3
+  const missing = DETAILED_KEYS.filter(([, key]) => !sections[key]).map(([marker]) => marker)
+
+  if (missing.length > 0) {
+    console.error('[ParserV3] Detailed missing markers:', missing.join(', '))
+    return null
+  }
+
+  if (!hasEnoughContent(sections as unknown as Record<string, string>, 12, 40)) {
+    console.error('[ParserV3] Detailed content insufficient')
+    return null
+  }
+
+  return sections
+}
+
+export const SNAPSHOT_SECTION_MARKERS_V3 = SNAPSHOT_KEYS.map(([marker]) => marker)
+export const DETAILED_SECTION_MARKERS_V3 = DETAILED_KEYS.map(([marker]) => marker)

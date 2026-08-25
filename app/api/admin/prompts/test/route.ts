@@ -33,9 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const isDetailed = key === 'detailed_system_prompt'
-    const evidence = await buildWebsiteEvidencePackage(url, {
-      depth: isDetailed ? 'detailed' : 'snapshot',
-    })
+    const evidence = await buildWebsiteEvidencePackage(url)
     const evidenceContext = formatEvidenceForAI(
       evidence,
       isDetailed ? 'detailed' : 'snapshot'

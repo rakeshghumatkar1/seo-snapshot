@@ -231,7 +231,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: result.error || 'Anonymisation failed',
+            error:
+              result.error ||
+              'Could not generate anonymised sample. Your source report was not changed.',
             status: 'failed',
             aiCalls: result.aiCalls,
           },
@@ -321,7 +323,102 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'publish') {
-      const row = existing || (await getShowcaseByReportId(reportId))
+      // Flush latest metadata from the drawer before publish gates
+      const flushLabel = String(
+        body.genericLabel || body.publicDisplayName || existing?.public_display_name || ''
+      )
+        .trim()
+        .slice(0, 120)
+      if (flushLabel) {
+        const flushCategory =
+          String(body.businessCategory || existing?.business_category || '').trim().slice(0, 80) ||
+          null
+        const flushLocation =
+          String(body.publicLocation || existing?.public_location || '').trim().slice(0, 120) || null
+        const flushSlug = await ensureUniqueSlug(
+          String(body.slug || existing?.slug || flushLabel).trim() ||
+            slugifyDisplayName(flushLabel),
+          reportId
+        )
+        await upsertAnonymizedShowcaseMeta({
+          reportId,
+          slug: flushSlug,
+          publicDisplayName: flushLabel,
+          businessCategory: flushCategory,
+          publicLocation: flushLocation,
+          featured: Boolean(body.featured ?? existing?.featured),
+          displayOrder: Number.isFinite(Number(body.displayOrder ?? existing?.display_order))
+            ? Math.max(0, Math.min(9999, Number(body.displayOrder ?? existing?.display_order ?? 0)))
+            : 0,
+          isActive: true,
+        })
+      }
+
+      const sectionsJson =
+        typeof report.sections_json === 'object' && report.sections_json
+          ? (report.sections_json as Record<string, unknown>)
+          : {}
+      const resolved = resolveExpectedKeysFromReport(sectionsJson, reportType)
+
+      // Flush pending section edits from the drawer (deterministic privacy only — no AI)
+      if (body.sections && typeof body.sections === 'object') {
+        const validationIncoming = validateAnonymizedStructure(
+          { sections: body.sections },
+          resolved.keys,
+          resolved.sourceSections
+        )
+        if (!validationIncoming.valid || !validationIncoming.sections) {
+          return NextResponse.json(
+            {
+              error: 'Cannot publish yet. Section structure is invalid.',
+              details: validationIncoming.errors,
+            },
+            { status: 400 }
+          )
+        }
+        const scan = runDeterministicPrivacyScan(
+          validationIncoming.sections,
+          report.website_url
+        )
+        const residualFlush = scanSectionsForIdentifiers(
+          scan.cleanedSections,
+          report.website_url
+        )
+        if (residualFlush.length) {
+          await saveAnonymizedDraft({
+            reportId,
+            sections: scan.cleanedSections,
+            reportVersion: resolved.version,
+            status: 'needs_review',
+            audit: {
+              deterministicPassed: false,
+              residual: residualFlush,
+              note: 'publish_flush',
+            },
+          })
+          return NextResponse.json(
+            {
+              error: 'Cannot publish yet. Privacy check found identifying information.',
+              residual: residualFlush,
+              privacyCheck: 'Needs Review',
+            },
+            { status: 400 }
+          )
+        }
+        await saveAnonymizedDraft({
+          reportId,
+          sections: scan.cleanedSections,
+          reportVersion: resolved.version,
+          status: 'ready',
+          audit: {
+            deterministicPassed: true,
+            residual: [],
+            note: 'publish_flush',
+          },
+        })
+      }
+
+      const row = await getShowcaseByReportId(reportId)
       if (!row || row.sample_content_mode !== 'anonymized') {
         return NextResponse.json({ error: 'Anonymised sample draft not found' }, { status: 404 })
       }
@@ -339,7 +436,10 @@ export async function POST(req: NextRequest) {
       }
       if (row.anonymization_status === 'needs_review') {
         return NextResponse.json(
-          { error: 'Resolve privacy review issues before publishing' },
+          {
+            error: 'Cannot publish yet. Privacy check found identifying information.',
+            privacyCheck: 'Needs Review',
+          },
           { status: 400 }
         )
       }
@@ -350,11 +450,6 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      const sectionsJson =
-        typeof report.sections_json === 'object' && report.sections_json
-          ? (report.sections_json as Record<string, unknown>)
-          : {}
-      const resolved = resolveExpectedKeysFromReport(sectionsJson, reportType)
       const validation = validateAnonymizedStructure(
         { sections: row.anonymized_sections_json },
         resolved.keys,
@@ -370,7 +465,11 @@ export async function POST(req: NextRequest) {
       const residual = scanSectionsForIdentifiers(validation.sections, report.website_url)
       if (residual.length) {
         return NextResponse.json(
-          { error: 'Deterministic privacy scan failed', residual },
+          {
+            error: 'Cannot publish yet. Privacy check found identifying information.',
+            residual,
+            privacyCheck: 'Needs Review',
+          },
           { status: 400 }
         )
       }
@@ -391,6 +490,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         showcase: published,
+        preview: publicSafePreview(published, report),
         publicUrl: published?.slug ? `/sample-report/${published.slug}` : null,
       })
     }

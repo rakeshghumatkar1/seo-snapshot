@@ -62,16 +62,19 @@ export async function POST(request: NextRequest) {
       sections: result.sections,
     };
 
-    // Archive report content and a permanent PDF asynchronously.
-    insertArchivedReport({
-      websiteUrl: cleanUrl,
-      reportType: 'snapshot',
-      email: undefined,
-      status: 'success',
-      sectionsJson: result.sections,
-    }).catch(err =>
+    // Finish archiving before responding so the report and PDF are not lost
+    // when the serverless request ends.
+    try {
+      await insertArchivedReport({
+        websiteUrl: cleanUrl,
+        reportType: 'snapshot',
+        email: undefined,
+        status: 'success',
+        sectionsJson: result.sections,
+      });
+    } catch (err) {
       console.error('[Snapshot] Report archive failed:', err)
-    );
+    }
 
     return NextResponse.json(report);
   } catch (error) {

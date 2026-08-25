@@ -13,6 +13,7 @@ import {
 import {
   ensureHomepageShowcaseSchema,
   ensureUniqueSlug,
+  getPublicSampleBySlug,
   getShowcaseByReportId,
   publishAnonymizedSample,
   saveAnonymizedDraft,
@@ -83,6 +84,44 @@ export async function GET(req: NextRequest) {
     }
 
     const showcase = await getShowcaseByReportId(reportId)
+    let publicVisible = false
+    let slugRowCount = 0
+    if (showcase?.slug) {
+      const publicRow = await getPublicSampleBySlug(String(showcase.slug))
+      publicVisible = Boolean(publicRow)
+      const slugRows = await dbQuery(
+        `SELECT id, report_id, use_as_sample, anonymization_status, sample_content_mode, updated_at
+         FROM homepage_showcase
+         WHERE slug = $1
+         ORDER BY updated_at DESC`,
+        [String(showcase.slug)]
+      )
+      slugRowCount = slugRows.length
+      return NextResponse.json({
+        report: {
+          id: report.id,
+          website_url: report.website_url,
+          report_type: report.report_type,
+          created_at: report.created_at,
+          status: report.status,
+        },
+        showcase: showcase || null,
+        preview: showcase ? publicSafePreview(showcase, report) : null,
+        diagnostics: {
+          publicVisible,
+          slugRowCount,
+          slugRows: slugRows.map((r: any) => ({
+            id: r.id,
+            report_id: r.report_id,
+            use_as_sample: r.use_as_sample,
+            anonymization_status: r.anonymization_status,
+            sample_content_mode: r.sample_content_mode,
+            updated_at: r.updated_at,
+          })),
+        },
+      })
+    }
+
     return NextResponse.json({
       report: {
         id: report.id,
@@ -93,6 +132,7 @@ export async function GET(req: NextRequest) {
       },
       showcase: showcase || null,
       preview: showcase ? publicSafePreview(showcase, report) : null,
+      diagnostics: { publicVisible, slugRowCount, slugRows: [] },
     })
   } catch (err) {
     console.error('[Admin/anonymize GET]', err)

@@ -28,10 +28,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const orderCol = table === 'rate_limits' ? 'updated_at' : 'created_at'
+    const selectColumns = table === 'reports'
+      ? `id, website_url, report_type, email, status, created_at,
+         pdf_filename, pdf_generated_at,
+         (pdf_base64 IS NOT NULL) AS has_pdf`
+      : '*'
 
     const [rows, countResult] = await Promise.all([
       dbQuery(
-        `SELECT * FROM ${table}
+        `SELECT ${selectColumns} FROM ${table}
          ORDER BY ${orderCol} DESC NULLS LAST
          LIMIT $1 OFFSET $2`,
         [limit, offset]

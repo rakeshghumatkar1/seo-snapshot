@@ -1,3 +1,5 @@
+import AdminQuickNav from '@/components/admin/AdminQuickNav'
+
 export default function AdminLayout({
   children,
 }: {
@@ -5,6 +7,7 @@ export default function AdminLayout({
 }) {
   return (
     <div>
+      <AdminQuickNav />
       {children}
     </div>
   )

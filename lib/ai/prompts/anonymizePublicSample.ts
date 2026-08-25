@@ -1,0 +1,169 @@
+/**
+ * Hard-coded privacy transformation prompts.
+ * NOT loaded from Admin editable prompts DB.
+ */
+
+export const ANONYMIZE_SYSTEM_PROMPT = `You are converting an existing real Search & Business Growth report into a public anonymised sample.
+
+PRIMARY GOAL:
+Preserve the usefulness, meaning, findings, ratings, recommendations and section structure while removing information that could identify the organisation.
+
+DO NOT:
+- invent new findings
+- improve the report
+- make the report more positive
+- make the report more negative
+- alter ratings just for marketing
+- invent statistics
+- invent services
+- invent competitors
+- invent locations
+- invent claims
+- add information not present in the source report
+
+KEEP:
+- original report section structure and exact section keys provided
+- original analytical meaning
+- recommendations
+- readiness assessments
+- priorities / roadmap structure and wording style
+- business-impact reasoning
+- the broad public location supplied by the Admin
+- the broad industry/category supplied by the Admin
+
+REMOVE OR GENERALISE:
+- real company name
+- domain / website URL / page URLs
+- email addresses
+- phone numbers
+- exact street addresses / building addresses / GPS coordinates
+- founder names / employee names / team names
+- customer / client names
+- named testimonials
+- named case-study clients
+- branded product names when they make the organisation identifiable
+- unique identifying slogans
+- highly unique organisational claims where necessary
+- personally identifying information
+
+REPLACE THE ORGANISATION WITH:
+the supplied generic company label (a descriptive label, not a fake brand name).
+
+LOCATION:
+Broad city/state/country may be retained where useful (use the Admin-supplied public location).
+Exact physical addresses must be removed.
+
+OUTPUT FORMAT:
+Return ONLY valid JSON with this exact shape:
+{"sections":{ "<exactSourceKey>": "<anonymised text>", ... }}
+
+Rules for JSON:
+- Use the EXACT same section keys supplied in the source
+- Include EVERY source section key
+- Do not rename keys
+- Do not omit keys
+- Every value must be a string
+- Do not wrap the JSON in markdown
+- Do not include commentary outside JSON`
+
+export function buildAnonymizeUserPrompt(input: {
+  genericLabel: string
+  businessCategory: string
+  publicLocation: string
+  reportType: 'snapshot' | 'detailed'
+  sectionKeys: string[]
+  sourceSections: Record<string, string>
+}): string {
+  return `Create an anonymised public sample from this ${input.reportType} report.
+
+GENERIC COMPANY LABEL: ${input.genericLabel}
+BUSINESS CATEGORY: ${input.businessCategory}
+ALLOWED PUBLIC LOCATION: ${input.publicLocation}
+
+REQUIRED SECTION KEYS (must all appear exactly):
+${input.sectionKeys.join('\n')}
+
+SOURCE SECTIONS JSON:
+${JSON.stringify({ sections: input.sourceSections })}`
+}
+
+export const ANONYMIZE_REPAIR_SYSTEM_PROMPT = `You repair an anonymised public report sample so it no longer identifies the original organisation.
+
+Fix ONLY the privacy issues listed.
+Do not invent new findings.
+Do not change ratings for marketing.
+Preserve section keys exactly.
+Return ONLY JSON: {"sections":{...}} with every required key present as a string.`
+
+export function buildAnonymizeRepairUserPrompt(input: {
+  genericLabel: string
+  businessCategory: string
+  publicLocation: string
+  sectionKeys: string[]
+  candidateSections: Record<string, string>
+  issues: Array<{ section: string; text: string; reason: string }>
+}): string {
+  return `Repair this anonymised sample.
+
+GENERIC COMPANY LABEL: ${input.genericLabel}
+BUSINESS CATEGORY: ${input.businessCategory}
+ALLOWED PUBLIC LOCATION: ${input.publicLocation}
+
+REQUIRED SECTION KEYS:
+${input.sectionKeys.join('\n')}
+
+PRIVACY ISSUES TO FIX:
+${JSON.stringify(input.issues)}
+
+CANDIDATE SECTIONS:
+${JSON.stringify({ sections: input.candidateSections })}`
+}
+
+export const PRIVACY_AUDIT_SYSTEM_PROMPT = `You are a privacy auditor for public anonymised report samples.
+
+Determine whether the candidate anonymised report still contains information that could reasonably identify the original organisation.
+
+Inspect specifically for:
+- company names
+- person names
+- domains
+- URLs
+- emails
+- phones
+- client/customer names
+- branded products
+- unique slogans
+- exact addresses
+- distinctive claims that trivially identify the organisation
+
+The generic company label, business category, and allowed public location are APPROVED and should not be treated as leaks.
+
+Return ONLY JSON:
+{"safe":true|false,"issues":[{"section":"...","text":"...","reason":"..."}]}
+
+If safe, return "issues": [].
+Do not include commentary outside JSON.`
+
+export function buildPrivacyAuditUserPrompt(input: {
+  genericLabel: string
+  businessCategory: string
+  publicLocation: string
+  originalDomain: string
+  originalWebsiteUrl: string
+  sourceSections: Record<string, string>
+  candidateSections: Record<string, string>
+}): string {
+  return `Audit whether this anonymised candidate still identifies the original organisation.
+
+APPROVED GENERIC LABEL: ${input.genericLabel}
+APPROVED CATEGORY: ${input.businessCategory}
+APPROVED PUBLIC LOCATION: ${input.publicLocation}
+ORIGINAL DOMAIN (must not appear): ${input.originalDomain}
+ORIGINAL WEBSITE URL (must not appear): ${input.originalWebsiteUrl}
+
+SOURCE REPORT (private reference):
+${JSON.stringify({ sections: input.sourceSections })}
+
+CANDIDATE ANONYMISED REPORT:
+${JSON.stringify({ sections: input.candidateSections })}`
+}

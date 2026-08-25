@@ -4,6 +4,16 @@ import { detectReportVersion } from '@/types/report'
 
 export const dynamic = 'force-dynamic'
 
+function cleanSectionMap(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {}
+  const clean: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (key === 'reportVersion') continue
+    if (typeof value === 'string') clean[key] = value
+  }
+  return clean
+}
+
 export async function GET(
   _req: NextRequest,
   context: { params: { slug: string } }
@@ -19,32 +29,42 @@ export async function GET(
       return NextResponse.json({ error: 'Sample report not found' }, { status: 404 })
     }
 
-    const sections =
-      typeof row.sections_json === 'object' && row.sections_json
-        ? (row.sections_json as Record<string, unknown>)
-        : {}
+    const mode = row.sample_content_mode === 'anonymized' ? 'anonymized' : 'source'
+    const reportType = row.report_type === 'detailed' ? 'detailed' : 'snapshot'
 
-    // Strip metadata that must never be public
-    const { reportVersion: _rv, ...sectionFields } = sections
-    const cleanSections: Record<string, string> = {}
-    for (const [key, value] of Object.entries(sectionFields)) {
-      if (typeof value === 'string') cleanSections[key] = value
+    let cleanSections: Record<string, string>
+    let version: 2 | 3
+
+    if (mode === 'anonymized') {
+      // CRITICAL: never fall back to original reports.sections_json
+      cleanSections = cleanSectionMap(row.anonymized_sections_json)
+      if (!Object.keys(cleanSections).length) {
+        return NextResponse.json({ error: 'Sample unavailable' }, { status: 404 })
+      }
+      version =
+        row.anonymized_report_version === 2 || row.anonymized_report_version === 3
+          ? row.anonymized_report_version
+          : detectReportVersion(cleanSections)
+    } else {
+      cleanSections = cleanSectionMap(row.sections_json)
+      version = detectReportVersion(row.sections_json || {})
     }
 
-    const reportType = row.report_type === 'detailed' ? 'detailed' : 'snapshot'
-    const version = detectReportVersion(sections)
+    const showDomain = mode === 'anonymized' ? false : Boolean(row.show_domain)
 
     return NextResponse.json({
       slug: row.slug,
       displayName: row.public_display_name,
-      domain: row.show_domain ? row.public_domain || null : null,
-      showDomain: Boolean(row.show_domain),
+      domain: showDomain ? row.public_domain || null : null,
+      showDomain,
       businessCategory: row.business_category || null,
+      publicLocation: row.public_location || null,
       reportType,
       reportVersion: version,
       generatedAt: row.created_at || null,
       sections: cleanSections,
-      // Never include email, website_url raw unless show_domain uses public_domain
+      sampleContentMode: mode,
+      isAnonymizedSample: mode === 'anonymized',
     })
   } catch (err) {
     console.error('[public/sample-report]', err)

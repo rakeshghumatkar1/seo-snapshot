@@ -15,6 +15,8 @@ interface ReportHeaderProps {
   /** Override analysed website URL; pass null to hide the row. */
   analysedUrl?: string | null
   isSample?: boolean
+  /** Optional short disclosure under the sample label. */
+  sampleDisclosure?: string
 }
 
 export default function ReportHeader({
@@ -24,6 +26,7 @@ export default function ReportHeader({
   preparedFor,
   analysedUrl,
   isSample = false,
+  sampleDisclosure,
 }: ReportHeaderProps) {
   const title = reportDocumentTitle(reportType)
   const domain = preparedFor?.trim() || displayDomain(websiteUrl)
@@ -36,7 +39,9 @@ export default function ReportHeader({
   return (
     <header className="report-doc-header" aria-labelledby="report-doc-title">
       {isSample && (
-        <p className="report-doc-sample-label">Sample Report</p>
+        <p className="report-doc-sample-label">
+          {sampleDisclosure || 'Sample Report'}
+        </p>
       )}
       <div className="report-doc-header-brand">
         <div className="report-doc-brand-text">

@@ -2,32 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import ReportHeader from '@/components/report/ReportHeader'
-import ReportSection from '@/components/report/ReportSection'
-import ReportFooter from '@/components/report/ReportFooter'
-import CTABlock from '@/components/report/CTABlock'
-import ServiceHelpCTA from '@/components/public/ServiceHelpCTA'
-import {
-  getSectionLabel,
-  iterableSectionEntries,
-} from '@/lib/report/sectionLabels'
-import { formatSectionNumber, isEmphasizedSection } from '@/lib/report/presentation'
-import { detectReportVersion } from '@/types/report'
-
-type SamplePayload = {
-  slug: string
-  displayName: string
-  domain: string | null
-  showDomain: boolean
-  businessCategory: string | null
-  reportType: 'snapshot' | 'detailed'
-  reportVersion: 2 | 3
-  generatedAt: string | null
-  sections: Record<string, string>
-}
+import SampleReportDocument, {
+  type SampleReportDocumentData,
+} from '@/components/public/SampleReportDocument'
 
 export default function SampleReportView({ slug }: { slug: string }) {
-  const [data, setData] = useState<SamplePayload | null>(null)
+  const [data, setData] = useState<SampleReportDocumentData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -40,11 +20,19 @@ export default function SampleReportView({ slug }: { slug: string }) {
       .then(async (res) => {
         const json = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(json.error || 'Sample report not found')
-        return json as SamplePayload
+        return json as SampleReportDocumentData & {
+          isAnonymizedSample?: boolean
+          sampleContentMode?: string
+        }
       })
       .then((payload) => {
         if (cancelled) return
-        setData(payload)
+        setData({
+          ...payload,
+          isAnonymizedSample:
+            Boolean(payload.isAnonymizedSample) ||
+            payload.sampleContentMode === 'anonymized',
+        })
       })
       .catch((err: Error) => {
         if (cancelled) return
@@ -87,60 +75,5 @@ export default function SampleReportView({ slug }: { slug: string }) {
     )
   }
 
-  const reportVersion = detectReportVersion(data.sections, data.reportVersion)
-  const analysedUrl =
-    data.showDomain && data.domain
-      ? data.domain.startsWith('http')
-        ? data.domain
-        : `https://${data.domain}`
-      : null
-
-  return (
-    <div className="public-page-content report-doc max-w-3xl mx-auto px-5 sm:px-6 py-10 sm:py-14">
-      <ReportHeader
-        websiteUrl={analysedUrl || data.displayName}
-        reportType={data.reportType}
-        generatedAt={data.generatedAt ? new Date(data.generatedAt) : undefined}
-        preparedFor={data.displayName}
-        analysedUrl={analysedUrl}
-        isSample
-      />
-
-      {data.businessCategory ? (
-        <p className="report-doc-sample-category">{data.businessCategory}</p>
-      ) : null}
-
-      <div className="report-doc-sections">
-        {iterableSectionEntries(data.sections).map(([key, value], index) => {
-          const label = getSectionLabel(key, data.reportType, reportVersion)
-          return (
-            <div key={key} className={`fade-up delay-${Math.min(index, 7)}`}>
-              <ReportSection
-                category={label.category}
-                title={label.title}
-                content={value}
-                sectionNumber={formatSectionNumber(index)}
-                emphasized={isEmphasizedSection(key, data.reportType, reportVersion)}
-              />
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="report-doc-actions">
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center">
-          <Link href="/tool" className="btn btn-primary btn-lg w-full sm:w-auto justify-center">
-            Generate Your Free Snapshot →
-          </Link>
-        </div>
-        <p className="report-doc-actions-note">
-          This is a public sample. Your own report is generated from your website.
-        </p>
-      </div>
-
-      <ServiceHelpCTA variant={data.reportType === 'snapshot' ? 'compact' : 'full'} />
-      <CTABlock />
-      <ReportFooter />
-    </div>
-  )
+  return <SampleReportDocument data={data} />
 }

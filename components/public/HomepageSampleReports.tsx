@@ -10,6 +10,8 @@ export type SampleReportCard = {
   showDomain: boolean
   reportType: 'snapshot' | 'detailed'
   businessCategory: string | null
+  publicLocation?: string | null
+  sampleContentMode?: 'source' | 'anonymized'
   featured?: boolean
 }
 
@@ -107,6 +109,8 @@ export default function HomepageSampleReports({
                   <h3 className="public-sample-name">{sample.displayName}</h3>
                   {sample.showDomain && sample.domain ? (
                     <p className="public-sample-domain">{sample.domain}</p>
+                  ) : sample.publicLocation ? (
+                    <p className="public-sample-domain">{sample.publicLocation}</p>
                   ) : null}
                   {sample.businessCategory ? (
                     <p className="public-sample-category">{sample.businessCategory}</p>

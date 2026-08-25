@@ -2751,6 +2751,13 @@ body:has(.public-site) .noise-overlay {
   border: 1px solid rgba(14, 165, 233, 0.22);
 }
 
+.public-site .report-doc-sample-disclosure {
+  margin: -0.35rem 0 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
 .public-site .report-doc-sample-category {
   margin: -0.5rem 0 1.25rem;
   font-size: 0.875rem;

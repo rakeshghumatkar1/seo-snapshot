@@ -9,6 +9,7 @@ import {
   getSectionLabel,
   iterableSectionEntries,
 } from '@/lib/report/sectionLabels'
+import AnonymizedSampleDrawer from '@/components/admin/AnonymizedSampleDrawer'
 
 type ReportType = 'all' | 'snapshot' | 'detailed'
 type SortDirection = 'asc' | 'desc'
@@ -78,6 +79,7 @@ export default function ReportsLibraryPage() {
     businessCategory: '',
     slug: '',
   })
+  const [anonymizeReport, setAnonymizeReport] = useState<ReportRow | null>(null)
 
   const loadReports = useCallback(async () => {
     setLoading(true)
@@ -352,6 +354,7 @@ export default function ReportsLibraryPage() {
                       <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
                         <button className="btn btn-secondary" onClick={() => setViewing(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>View Report</button>
                         <button className="btn btn-secondary" onClick={() => openShowcase(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>Homepage Showcase</button>
+                        <button className="btn btn-secondary" onClick={() => setAnonymizeReport(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>Anonymised Sample</button>
                         <a href={`/api/admin/reports/${row.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ fontSize: '10px', padding: '5px 9px', textDecoration: 'none' }}>View PDF</a>
                         <a href={`/api/admin/reports/${row.id}/pdf?download=1`} className="btn btn-secondary" style={{ fontSize: '10px', padding: '5px 9px', textDecoration: 'none' }}>Download</a>
                         <button disabled={actionLoading} onClick={() => deleteReport(row)} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.28)', background: 'transparent', color: '#f87171', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>Delete</button>
@@ -422,7 +425,7 @@ export default function ReportsLibraryPage() {
 
             <div style={{ padding: '20px 22px', overflowY: 'auto' }}>
               <p style={{ fontSize: '12px', color: 'var(--t-400)', lineHeight: 1.55, marginBottom: '16px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                Only the public display information and approved report content will be visible. Lead name/email and internal metadata are never published.
+                Only the public display information and approved report content will be visible. Lead name/email and internal metadata are never published. For privacy-safe generic samples, use Anonymised Sample instead.
               </p>
 
               {showcaseLoading ? (
@@ -534,6 +537,13 @@ export default function ReportsLibraryPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {anonymizeReport && (
+        <AnonymizedSampleDrawer
+          report={anonymizeReport}
+          onClose={() => setAnonymizeReport(null)}
+        />
       )}
     </main>
   )

@@ -87,6 +87,23 @@ export async function POST(req: NextRequest) {
     const requestedSlug = String(body.slug || publicDisplayName || 'sample-report').trim()
     const slug = await ensureUniqueSlug(requestedSlug || slugifyDisplayName(publicDisplayName), reportId)
 
+    // Classic showcase uses original report content (source mode).
+    // Anonymised samples must be published via /api/admin/showcase/anonymize.
+    const existing = await getShowcaseByReportId(reportId)
+    if (
+      existing?.sample_content_mode === 'anonymized' &&
+      useAsSample &&
+      existing.anonymization_status === 'published'
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'This report has a published anonymised sample. Use “Edit Anonymised Sample” to manage it, or unpublish that sample first.',
+        },
+        { status: 400 }
+      )
+    }
+
     const rows = await dbQuery(
       `INSERT INTO homepage_showcase (
         report_id,
@@ -100,8 +117,9 @@ export async function POST(req: NextRequest) {
         display_order,
         is_active,
         featured,
+        sample_content_mode,
         updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'source',NOW())
       ON CONFLICT (report_id) DO UPDATE SET
         slug = EXCLUDED.slug,
         public_display_name = EXCLUDED.public_display_name,
@@ -113,6 +131,10 @@ export async function POST(req: NextRequest) {
         display_order = EXCLUDED.display_order,
         is_active = EXCLUDED.is_active,
         featured = EXCLUDED.featured,
+        sample_content_mode = CASE
+          WHEN EXCLUDED.use_as_sample = TRUE THEN 'source'
+          ELSE COALESCE(homepage_showcase.sample_content_mode, 'source')
+        END,
         updated_at = NOW()
       RETURNING *`,
       [

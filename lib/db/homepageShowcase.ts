@@ -34,6 +34,16 @@ export async function ensureHomepageShowcaseSchema(): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_homepage_showcase_sample
         ON homepage_showcase (is_active, use_as_sample, display_order ASC)
       `)
+
+      // Anonymised public sample fields (safe idempotent additive migration)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS sample_content_mode TEXT NOT NULL DEFAULT 'source'`)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS anonymized_sections_json JSONB`)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS anonymized_report_version INTEGER`)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS public_location TEXT`)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS anonymization_status TEXT NOT NULL DEFAULT 'none'`)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS anonymization_audit_json JSONB`)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS anonymized_at TIMESTAMP WITH TIME ZONE`)
+      await dbQuery(`ALTER TABLE homepage_showcase ADD COLUMN IF NOT EXISTS anonymization_updated_at TIMESTAMP WITH TIME ZONE`)
     })().catch(err => {
       schemaPromise = null
       throw err
@@ -82,6 +92,8 @@ export type ShowcasePublicSample = {
   showDomain: boolean
   reportType: 'snapshot' | 'detailed'
   businessCategory: string | null
+  publicLocation: string | null
+  sampleContentMode: 'source' | 'anonymized'
   featured: boolean
 }
 
@@ -106,13 +118,25 @@ export async function getPublicHomepageShowcase(): Promise<{
         hs.public_domain,
         hs.show_domain,
         hs.business_category,
+        hs.public_location,
         hs.featured,
+        hs.sample_content_mode,
+        hs.anonymization_status,
+        hs.anonymized_sections_json,
         r.report_type
       FROM homepage_showcase hs
       INNER JOIN reports r ON r.id = hs.report_id
       WHERE hs.is_active = TRUE
         AND hs.use_as_sample = TRUE
         AND COALESCE(r.status, 'success') = 'success'
+        AND (
+          COALESCE(hs.sample_content_mode, 'source') = 'source'
+          OR (
+            hs.sample_content_mode = 'anonymized'
+            AND hs.anonymization_status = 'published'
+            AND hs.anonymized_sections_json IS NOT NULL
+          )
+        )
       ORDER BY hs.featured DESC, hs.display_order ASC, hs.updated_at DESC
       LIMIT 12
     `),
@@ -132,15 +156,21 @@ export async function getPublicHomepageShowcase(): Promise<{
 
   return {
     stats,
-    sampleReports: samples.map((row: any) => ({
-      slug: row.slug,
-      displayName: row.public_display_name,
-      domain: row.show_domain ? row.public_domain || null : null,
-      showDomain: Boolean(row.show_domain),
-      reportType: row.report_type === 'detailed' ? 'detailed' : 'snapshot',
-      businessCategory: row.business_category || null,
-      featured: Boolean(row.featured),
-    })),
+    sampleReports: samples.map((row: any) => {
+      const mode = row.sample_content_mode === 'anonymized' ? 'anonymized' : 'source'
+      const showDomain = mode === 'anonymized' ? false : Boolean(row.show_domain)
+      return {
+        slug: row.slug,
+        displayName: row.public_display_name,
+        domain: showDomain ? row.public_domain || null : null,
+        showDomain,
+        reportType: row.report_type === 'detailed' ? 'detailed' : 'snapshot',
+        businessCategory: row.business_category || null,
+        publicLocation: row.public_location || null,
+        sampleContentMode: mode as 'source' | 'anonymized',
+        featured: Boolean(row.featured),
+      }
+    }),
     recentBusinesses: recent.map((row: any) => ({
       displayName: row.public_display_name,
       domain: row.public_domain || null,
@@ -204,11 +234,15 @@ export async function getPublicSampleBySlug(slug: string) {
       hs.public_domain,
       hs.show_domain,
       hs.business_category,
+      hs.public_location,
+      hs.sample_content_mode,
+      hs.anonymization_status,
+      hs.anonymized_sections_json,
+      hs.anonymized_report_version,
       hs.updated_at,
       r.report_type,
       r.created_at,
-      r.sections_json,
-      r.website_url
+      r.sections_json
      FROM homepage_showcase hs
      INNER JOIN reports r ON r.id = hs.report_id
      WHERE hs.slug = $1
@@ -217,6 +251,161 @@ export async function getPublicSampleBySlug(slug: string) {
        AND COALESCE(r.status, 'success') = 'success'
      LIMIT 1`,
     [slug]
+  )
+  const row = rows[0] || null
+  if (!row) return null
+
+  // Anonymised samples must never fall back to original sections_json
+  if (row.sample_content_mode === 'anonymized') {
+    if (
+      row.anonymization_status !== 'published' ||
+      !row.anonymized_sections_json ||
+      typeof row.anonymized_sections_json !== 'object'
+    ) {
+      return null
+    }
+  }
+
+  return row
+}
+
+export async function upsertAnonymizedShowcaseMeta(input: {
+  reportId: string
+  slug: string
+  publicDisplayName: string
+  businessCategory: string | null
+  publicLocation: string | null
+  featured: boolean
+  displayOrder: number
+  isActive?: boolean
+}) {
+  await ensureHomepageShowcaseSchema()
+  const rows = await dbQuery(
+    `INSERT INTO homepage_showcase (
+      report_id,
+      slug,
+      public_display_name,
+      public_domain,
+      business_category,
+      public_location,
+      use_as_sample,
+      show_recently_analysed,
+      show_domain,
+      display_order,
+      is_active,
+      featured,
+      sample_content_mode,
+      anonymization_status,
+      updated_at,
+      anonymization_updated_at
+    ) VALUES ($1,$2,$3,NULL,$4,$5,FALSE,FALSE,FALSE,$6,COALESCE($7,TRUE),$8,'anonymized','none',NOW(),NOW())
+    ON CONFLICT (report_id) DO UPDATE SET
+      slug = EXCLUDED.slug,
+      public_display_name = EXCLUDED.public_display_name,
+      business_category = EXCLUDED.business_category,
+      public_location = EXCLUDED.public_location,
+      show_domain = FALSE,
+      display_order = EXCLUDED.display_order,
+      is_active = COALESCE($7, homepage_showcase.is_active),
+      featured = EXCLUDED.featured,
+      sample_content_mode = 'anonymized',
+      updated_at = NOW(),
+      anonymization_updated_at = NOW()
+    RETURNING *`,
+    [
+      input.reportId,
+      input.slug,
+      input.publicDisplayName,
+      input.businessCategory,
+      input.publicLocation,
+      input.displayOrder,
+      typeof input.isActive === 'boolean' ? input.isActive : null,
+      input.featured,
+    ]
+  )
+  return rows[0]
+}
+
+export async function saveAnonymizedDraft(input: {
+  reportId: string
+  sections: Record<string, string>
+  reportVersion: number
+  status: string
+  audit: unknown
+}) {
+  await ensureHomepageShowcaseSchema()
+  const rows = await dbQuery(
+    `UPDATE homepage_showcase SET
+      anonymized_sections_json = $2::jsonb,
+      anonymized_report_version = $3,
+      anonymization_status = $4,
+      anonymization_audit_json = $5::jsonb,
+      anonymized_at = NOW(),
+      anonymization_updated_at = NOW(),
+      sample_content_mode = 'anonymized',
+      show_domain = FALSE,
+      use_as_sample = FALSE,
+      updated_at = NOW()
+     WHERE report_id = $1
+     RETURNING *`,
+    [
+      input.reportId,
+      JSON.stringify(input.sections),
+      input.reportVersion,
+      input.status,
+      JSON.stringify(input.audit ?? null),
+    ]
+  )
+  return rows[0] || null
+}
+
+export async function setAnonymizationStatus(reportId: string, status: string) {
+  await ensureHomepageShowcaseSchema()
+  const rows = await dbQuery(
+    `UPDATE homepage_showcase SET
+      anonymization_status = $2,
+      anonymization_updated_at = NOW(),
+      updated_at = NOW()
+     WHERE report_id = $1
+     RETURNING *`,
+    [reportId, status]
+  )
+  return rows[0] || null
+}
+
+export async function publishAnonymizedSample(reportId: string) {
+  await ensureHomepageShowcaseSchema()
+  const rows = await dbQuery(
+    `UPDATE homepage_showcase SET
+      use_as_sample = TRUE,
+      is_active = TRUE,
+      show_domain = FALSE,
+      show_recently_analysed = FALSE,
+      sample_content_mode = 'anonymized',
+      anonymization_status = 'published',
+      anonymization_updated_at = NOW(),
+      updated_at = NOW()
+     WHERE report_id = $1
+     RETURNING *`,
+    [reportId]
+  )
+  return rows[0] || null
+}
+
+export async function unpublishAnonymizedSample(reportId: string) {
+  await ensureHomepageShowcaseSchema()
+  const rows = await dbQuery(
+    `UPDATE homepage_showcase SET
+      use_as_sample = FALSE,
+      anonymization_status = CASE
+        WHEN anonymized_sections_json IS NOT NULL THEN 'draft'
+        ELSE anonymization_status
+      END,
+      anonymization_updated_at = NOW(),
+      updated_at = NOW()
+     WHERE report_id = $1
+     RETURNING *`,
+    [reportId]
   )
   return rows[0] || null
 }

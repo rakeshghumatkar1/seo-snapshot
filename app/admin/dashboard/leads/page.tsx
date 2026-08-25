@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-type LeadStatus = 'all' | 'genuine' | 'test'
 type SortDirection = 'asc' | 'desc'
 
 interface Lead {
@@ -14,14 +13,7 @@ interface Lead {
   company: string | null
   website_url: string
   requested_report_type: string
-  is_test: boolean
   created_at: string
-}
-
-interface LeadSummary {
-  total: number
-  genuine: number
-  test: number
 }
 
 interface EditForm {
@@ -30,10 +22,7 @@ interface EditForm {
   company: string
   websiteUrl: string
   requestedReportType: string
-  isTest: boolean
 }
-
-const EMPTY_SUMMARY: LeadSummary = { total: 0, genuine: 0, test: 0 }
 
 function formatDate(value: string) {
   if (!value) return '—'
@@ -49,12 +38,10 @@ function formatDate(value: string) {
 export default function LeadManagerPage() {
   const router = useRouter()
   const [rows, setRows] = useState<Lead[]>([])
-  const [summary, setSummary] = useState<LeadSummary>(EMPTY_SUMMARY)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalRows, setTotalRows] = useState(0)
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<LeadStatus>('all')
   const [sort, setSort] = useState('created_at')
   const [direction, setDirection] = useState<SortDirection>('desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -73,7 +60,6 @@ export default function LeadManagerPage() {
         page: String(page),
         limit: '20',
         q: query,
-        status,
         sort,
         dir: direction,
       })
@@ -88,7 +74,6 @@ export default function LeadManagerPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to load leads')
 
       setRows(data.rows || [])
-      setSummary(data.summary || EMPTY_SUMMARY)
       setTotalRows(Number(data.total || 0))
       setTotalPages(Math.max(1, Number(data.totalPages || 1)))
       setSelected(new Set())
@@ -97,12 +82,10 @@ export default function LeadManagerPage() {
     } finally {
       setLoading(false)
     }
-  }, [direction, page, query, router, sort, status])
+  }, [direction, page, query, router, sort])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadLeads()
-    }, 250)
+    const timer = setTimeout(loadLeads, 250)
     return () => clearTimeout(timer)
   }, [loadLeads])
 
@@ -127,30 +110,6 @@ export default function LeadManagerPage() {
       else rows.forEach(row => next.add(row.id))
       return next
     })
-  }
-
-  async function setLeadClassification(ids: string[], isTest: boolean) {
-    if (!ids.length) return
-    setActionLoading(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/admin/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: isTest ? 'set_test' : 'set_genuine',
-          ids,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to update leads')
-      await loadLeads()
-    } catch (err: any) {
-      setError(err?.message || 'Failed to update leads')
-    } finally {
-      setActionLoading(false)
-    }
   }
 
   async function deleteLeads(ids: string[]) {
@@ -190,7 +149,6 @@ export default function LeadManagerPage() {
       company: lead.company || '',
       websiteUrl: lead.website_url || '',
       requestedReportType: lead.requested_report_type || '',
-      isTest: Boolean(lead.is_test),
     })
   }
 
@@ -212,6 +170,7 @@ export default function LeadManagerPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to save lead')
+
       setEditing(null)
       setForm(null)
       await loadLeads()
@@ -253,39 +212,22 @@ export default function LeadManagerPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', padding: '58px 28px 40px', maxWidth: '1500px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+    <main style={{ minHeight: '100vh', padding: '42px 28px 40px', maxWidth: '1500px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '22px', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', color: '#34d399', marginBottom: '7px' }}>
             ADMIN · LEADS
           </div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '26px', fontWeight: 800, color: 'var(--t-100)', margin: 0 }}>
-            Lead Manager
+            Leads
           </h1>
           <div style={{ color: 'var(--t-400)', fontSize: '13px', marginTop: '7px' }}>
-            Classify test records, edit lead details, sort the database and permanently remove unwanted entries.
+            {totalRows} total leads · Search, sort, edit or delete records.
           </div>
         </div>
         <Link href="/admin/dashboard" className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: '12px' }}>
           ← Dashboard
         </Link>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '14px', marginBottom: '20px' }}>
-        {[
-          { label: 'Genuine Leads', value: summary.genuine, color: '#10b981' },
-          { label: 'Test Leads', value: summary.test, color: '#f59e0b' },
-          { label: 'All Records', value: summary.total, color: '#6366f1' },
-        ].map(card => (
-          <div key={card.label} className="glass" style={{ padding: '18px 20px' }}>
-            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--t-400)', marginBottom: '7px' }}>
-              {card.label}
-            </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '27px', fontWeight: 800, color: card.color }}>
-              {card.value}
-            </div>
-          </div>
-        ))}
       </div>
 
       <div className="glass" style={{ padding: '18px', marginBottom: '18px' }}>
@@ -294,17 +236,8 @@ export default function LeadManagerPage() {
             value={query}
             onChange={e => { setQuery(e.target.value); setPage(1) }}
             placeholder="Search email, name, company or website..."
-            style={{ ...controlStyle, flex: '1 1 280px', minWidth: '220px' }}
+            style={{ ...controlStyle, flex: '1 1 300px', minWidth: '220px' }}
           />
-          <select
-            value={status}
-            onChange={e => { setStatus(e.target.value as LeadStatus); setPage(1) }}
-            style={controlStyle}
-          >
-            <option value="all">All records</option>
-            <option value="genuine">Genuine only</option>
-            <option value="test">Test only</option>
-          </select>
           <select value={sort} onChange={e => { setSort(e.target.value); setPage(1) }} style={controlStyle}>
             <option value="created_at">Sort: Date</option>
             <option value="company">Sort: Company</option>
@@ -312,7 +245,6 @@ export default function LeadManagerPage() {
             <option value="email">Sort: Email</option>
             <option value="website_url">Sort: Website</option>
             <option value="requested_report_type">Sort: Report Type</option>
-            <option value="is_test">Sort: Test Status</option>
           </select>
           <button
             onClick={() => setDirection(d => d === 'asc' ? 'desc' : 'asc')}
@@ -326,12 +258,6 @@ export default function LeadManagerPage() {
         {selected.size > 0 && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--glass-border)' }}>
             <span style={{ fontSize: '12px', color: 'var(--t-300)', marginRight: '4px' }}>{selected.size} selected</span>
-            <button disabled={actionLoading} className="btn btn-secondary" onClick={() => setLeadClassification(Array.from(selected), false)} style={{ fontSize: '11px', padding: '7px 12px' }}>
-              Mark Genuine
-            </button>
-            <button disabled={actionLoading} className="btn btn-secondary" onClick={() => setLeadClassification(Array.from(selected), true)} style={{ fontSize: '11px', padding: '7px 12px' }}>
-              Mark Test
-            </button>
             <button
               disabled={actionLoading}
               onClick={() => deleteLeads(Array.from(selected))}
@@ -363,11 +289,11 @@ export default function LeadManagerPage() {
           </div>
         ) : rows.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '54px', color: 'var(--t-400)', fontSize: '13px' }}>
-            No leads match these filters.
+            No leads match your search.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
               <thead>
                 <tr>
                   <th style={{ ...thStyle, width: '42px' }}>
@@ -378,7 +304,6 @@ export default function LeadManagerPage() {
                   <th style={thStyle}>Company</th>
                   <th style={thStyle}>Website</th>
                   <th style={thStyle}>Report</th>
-                  <th style={thStyle}>Status</th>
                   <th style={thStyle}>Created</th>
                   <th style={thStyle}>Actions</th>
                 </tr>
@@ -398,17 +323,11 @@ export default function LeadManagerPage() {
                       </a>
                     </td>
                     <td style={tdStyle}>{row.requested_report_type}</td>
-                    <td style={tdStyle}>
-                      <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: '100px', fontSize: '10px', fontWeight: 800, color: row.is_test ? '#f59e0b' : '#34d399', background: row.is_test ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)', border: row.is_test ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(16,185,129,0.25)' }}>
-                        {row.is_test ? 'TEST' : 'GENUINE'}
-                      </span>
-                    </td>
                     <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--t-400)' }}>{formatDate(row.created_at)}</td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
-                        <button className="btn btn-secondary" disabled={actionLoading} onClick={() => openEdit(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>Edit</button>
-                        <button className="btn btn-secondary" disabled={actionLoading} onClick={() => setLeadClassification([row.id], !row.is_test)} style={{ fontSize: '10px', padding: '5px 9px' }}>
-                          {row.is_test ? 'Genuine' : 'Test'}
+                        <button className="btn btn-secondary" disabled={actionLoading} onClick={() => openEdit(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>
+                          Edit
                         </button>
                         <button
                           disabled={actionLoading}
@@ -466,10 +385,6 @@ export default function LeadManagerPage() {
               <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--t-300)', gridColumn: '1 / -1' }}>
                 Website *
                 <input value={form.websiteUrl} onChange={e => setForm({ ...form, websiteUrl: e.target.value })} style={controlStyle} />
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--t-200)', gridColumn: '1 / -1', cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.isTest} onChange={e => setForm({ ...form, isTest: e.target.checked })} />
-                Mark this record as test data
               </label>
             </div>
 

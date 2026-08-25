@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation'
 import { getSectionLabel } from '@/lib/report/sectionLabels'
 import { sectionOrderKeys } from '@/lib/report/presentation'
 import { detectReportVersion } from '@/types/report'
+import {
+  deriveSlugFromLabel,
+  mergeSuggestedMetadata,
+  missingMetadataMessages,
+  needsMetadataSuggestion,
+} from '@/lib/anonymize/sampleMetadataHelpers'
 
 type ReportRow = {
   id: string
@@ -72,6 +78,8 @@ export default function AnonymizedSampleDrawer({
   const [sectionDraft, setSectionDraft] = useState<Record<string, string>>({})
   const [metaSaveState, setMetaSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [sectionSaveState, setSectionSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [preparingMeta, setPreparingMeta] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [form, setForm] = useState<FormState>({
     genericLabel: '',
     businessCategory: '',
@@ -87,6 +95,8 @@ export default function AnonymizedSampleDrawer({
   const metaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const busyRef = useRef(false)
+  const slugManualRef = useRef(false)
+  const suggestAttemptedRef = useRef(false)
 
   formRef.current = form
   sectionsRef.current = sectionDraft
@@ -183,7 +193,10 @@ export default function AnonymizedSampleDrawer({
   async function load() {
     setLoading(true)
     setError(null)
+    setPreparingMeta(false)
     readyRef.current = false
+    suggestAttemptedRef.current = false
+    slugManualRef.current = false
     try {
       const res = await fetch(
         `/api/admin/showcase/anonymize?reportId=${encodeURIComponent(report.id)}`,
@@ -198,14 +211,18 @@ export default function AnonymizedSampleDrawer({
       const sc = data.showcase
       const pv = data.preview as PreviewPayload | null
       setPreview(pv)
-      setForm({
+      const hydrated: FormState = {
         genericLabel: String(sc?.public_display_name || ''),
         businessCategory: String(sc?.business_category || ''),
         publicLocation: String(sc?.public_location || ''),
         slug: String(sc?.slug || ''),
         featured: Boolean(sc?.featured),
         displayOrder: Number(sc?.display_order || 0),
-      })
+      }
+      // Existing slug from DB counts as established (do not auto-overwrite)
+      if (hydrated.slug.trim()) slugManualRef.current = true
+      setForm(hydrated)
+      formRef.current = hydrated
       const sections =
         (pv?.sections && typeof pv.sections === 'object' ? pv.sections : null) || {}
       setSectionDraft(sections)
@@ -222,14 +239,55 @@ export default function AnonymizedSampleDrawer({
       setAuditIssues(Array.isArray(issues) ? issues : [])
       setMetaSaveState('idle')
       setSectionSaveState('idle')
+
+      // Existing saved metadata wins — only suggest for missing fields on new/partial samples
+      if (needsMetadataSuggestion(hydrated) && !suggestAttemptedRef.current) {
+        suggestAttemptedRef.current = true
+        setPreparingMeta(true)
+        setLoading(false)
+        try {
+          await suggestAndMergeMeta()
+        } finally {
+          setPreparingMeta(false)
+        }
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to load')
     } finally {
       setLoading(false)
-      // Allow autosave after initial hydrate settles
+      setPreparingMeta(false)
       setTimeout(() => {
         readyRef.current = true
       }, 50)
+    }
+  }
+
+  async function suggestAndMergeMeta() {
+    try {
+      const data = await apiPost('suggest_meta')
+      if (!data?.suggestion) return
+      const current = formRef.current
+      const merged = mergeSuggestedMetadata(current, {
+        genericLabel: data.suggestion.genericLabel,
+        businessCategory: data.suggestion.businessCategory,
+        publicLocation: data.suggestion.publicLocation,
+      })
+      const next: FormState = {
+        ...current,
+        genericLabel: merged.genericLabel,
+        businessCategory: merged.businessCategory,
+        publicLocation: merged.publicLocation,
+      }
+      if (!slugManualRef.current) {
+        if (!current.slug.trim() && next.genericLabel.trim()) {
+          next.slug = deriveSlugFromLabel(next.genericLabel)
+        }
+      }
+      setForm(next)
+      formRef.current = next
+      setError(null)
+    } catch {
+      // Soft-fail: Admin can still type metadata manually
     }
   }
 
@@ -313,11 +371,6 @@ export default function AnonymizedSampleDrawer({
       if (!ok) return
     }
 
-    if (!form.genericLabel.trim() || !form.businessCategory.trim() || !form.publicLocation.trim()) {
-      setError('Generic company label, business category, and public location are required.')
-      return
-    }
-
     if (metaTimer.current) clearTimeout(metaTimer.current)
     if (sectionTimer.current) clearTimeout(sectionTimer.current)
 
@@ -326,6 +379,21 @@ export default function AnonymizedSampleDrawer({
     setError(null)
     setSuccessNote(null)
     try {
+      // Fallback: infer any still-missing metadata once before failing
+      if (needsMetadataSuggestion(formRef.current)) {
+        setPreparingMeta(true)
+        await suggestAndMergeMeta()
+        setPreparingMeta(false)
+      }
+
+      const current = formRef.current
+      const missing = missingMetadataMessages(current)
+      if (missing.length) {
+        setError(missing.join(' '))
+        setAdvancedOpen(true)
+        return
+      }
+
       const metaOk = await saveMetaNow()
       if (!metaOk) {
         setError('Could not save metadata. Generation was not started.')
@@ -349,6 +417,7 @@ export default function AnonymizedSampleDrawer({
       if (err?.data) applyServerPayload(err.data)
     } finally {
       setGenerating(false)
+      setPreparingMeta(false)
       busyRef.current = false
     }
   }
@@ -497,15 +566,16 @@ export default function AnonymizedSampleDrawer({
             style={{
               fontSize: '12px',
               color: 'var(--t-400)',
-              lineHeight: 1.55,
-              marginBottom: '14px',
-              padding: '10px 12px',
+              lineHeight: 1.5,
+              marginBottom: '12px',
+              padding: '8px 10px',
               borderRadius: '8px',
               background: 'rgba(16,185,129,0.08)',
               border: '1px solid rgba(16,185,129,0.22)',
             }}
           >
-            Enter public metadata, generate an anonymised draft, preview, then publish. Metadata and section edits save automatically. Nothing auto-publishes.
+            Generate an anonymised draft, preview, then publish. Metadata and section edits save
+            automatically. Nothing auto-publishes.
           </p>
 
           {loading ? (
@@ -514,6 +584,21 @@ export default function AnonymizedSampleDrawer({
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '12px' }}>
+              {preparingMeta ? (
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--t-300)',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: '1px dashed var(--glass-border)',
+                    background: 'rgba(15,23,42,0.02)',
+                  }}
+                >
+                  Preparing sample details…
+                </div>
+              ) : null}
+
               <div
                 style={{
                   display: 'grid',
@@ -535,8 +620,18 @@ export default function AnonymizedSampleDrawer({
                   Generic company label
                   <input
                     value={form.genericLabel}
-                    onChange={(e) => setForm((p) => ({ ...p, genericLabel: e.target.value }))}
-                    disabled={busy}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setForm((p) => {
+                        const next = { ...p, genericLabel: value }
+                        if (!slugManualRef.current) {
+                          next.slug = value.trim() ? deriveSlugFromLabel(value) : ''
+                        }
+                        return next
+                      })
+                      if (error) setError(null)
+                    }}
+                    disabled={busy || preparingMeta}
                     style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
                     placeholder="e.g. B2B Digital Services Company"
                   />
@@ -555,8 +650,11 @@ export default function AnonymizedSampleDrawer({
                   Business category
                   <input
                     value={form.businessCategory}
-                    onChange={(e) => setForm((p) => ({ ...p, businessCategory: e.target.value }))}
-                    disabled={busy}
+                    onChange={(e) => {
+                      setForm((p) => ({ ...p, businessCategory: e.target.value }))
+                      if (error) setError(null)
+                    }}
+                    disabled={busy || preparingMeta}
                     style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
                     placeholder="e.g. Digital Marketing"
                   />
@@ -575,56 +673,111 @@ export default function AnonymizedSampleDrawer({
                   Public location
                   <input
                     value={form.publicLocation}
-                    onChange={(e) => setForm((p) => ({ ...p, publicLocation: e.target.value }))}
-                    disabled={busy}
+                    onChange={(e) => {
+                      setForm((p) => ({ ...p, publicLocation: e.target.value }))
+                      if (error) setError(null)
+                    }}
+                    disabled={busy || preparingMeta}
                     style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
                     placeholder="e.g. Pune, India"
                   />
                 </label>
-                <label
-                  style={{
-                    display: 'grid',
-                    gap: '6px',
-                    fontSize: '11px',
-                    color: 'var(--t-400)',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Public slug
-                  <input
-                    value={form.slug}
-                    onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))}
-                    disabled={busy}
-                    style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
-                    placeholder="b2b-digital-services-company"
-                  />
-                </label>
               </div>
 
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--t-200)', fontSize: '13px' }}>
-                  <input
-                    type="checkbox"
-                    checked={form.featured}
-                    disabled={busy}
-                    onChange={(e) => setForm((p) => ({ ...p, featured: e.target.checked }))}
-                  />
-                  Featured
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--t-200)', fontSize: '13px' }}>
-                  Display order
-                  <input
-                    type="number"
-                    min={0}
-                    max={9999}
-                    disabled={busy}
-                    value={form.displayOrder}
-                    onChange={(e) => setForm((p) => ({ ...p, displayOrder: Number(e.target.value || 0) }))}
-                    style={{ ...controlStyle, width: '90px', fontWeight: 500 }}
-                  />
-                </label>
+              <div>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-ghost admin-btn-sm"
+                  onClick={() => setAdvancedOpen((v) => !v)}
+                  style={{ marginBottom: advancedOpen ? 8 : 0 }}
+                >
+                  {advancedOpen ? 'Hide advanced options' : 'Advanced options'}
+                </button>
+                {advancedOpen ? (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gap: '12px',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--glass-border)',
+                      background: 'rgba(15,23,42,0.02)',
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: 'grid',
+                        gap: '6px',
+                        fontSize: '11px',
+                        color: 'var(--t-400)',
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Public slug
+                      <input
+                        value={form.slug}
+                        onChange={(e) => {
+                          slugManualRef.current = true
+                          setForm((p) => ({ ...p, slug: e.target.value }))
+                        }}
+                        disabled={busy}
+                        style={{
+                          ...controlStyle,
+                          fontWeight: 500,
+                          textTransform: 'none',
+                          letterSpacing: 'normal',
+                        }}
+                        placeholder="b2b-digital-services-company"
+                      />
+                    </label>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          color: 'var(--t-200)',
+                          fontSize: '13px',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.featured}
+                          disabled={busy}
+                          onChange={(e) => setForm((p) => ({ ...p, featured: e.target.checked }))}
+                        />
+                        Featured
+                      </label>
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          color: 'var(--t-200)',
+                          fontSize: '13px',
+                        }}
+                      >
+                        Display order
+                        <input
+                          type="number"
+                          min={0}
+                          max={9999}
+                          disabled={busy}
+                          value={form.displayOrder}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              displayOrder: Number(e.target.value || 0),
+                            }))
+                          }
+                          style={{ ...controlStyle, width: '90px', fontWeight: 500 }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div
@@ -634,7 +787,7 @@ export default function AnonymizedSampleDrawer({
                   gap: '10px 16px',
                   padding: '10px 12px',
                   borderRadius: '8px',
-                  background: 'rgba(255,255,255,0.03)',
+                  background: 'rgba(15,23,42,0.02)',
                   border: '1px solid var(--glass-border)',
                   fontSize: '12px',
                 }}
@@ -648,11 +801,11 @@ export default function AnonymizedSampleDrawer({
                     style={{
                       color:
                         privacyCheck === 'Passed'
-                          ? '#34d399'
+                          ? '#0f766e'
                           : privacyCheck === 'Needs Review'
-                            ? '#f59e0b'
+                            ? '#b45309'
                             : privacyCheck
-                              ? '#f87171'
+                              ? '#dc2626'
                               : 'var(--t-200)',
                     }}
                   >
@@ -664,11 +817,14 @@ export default function AnonymizedSampleDrawer({
                 </span>
                 {preview?.anonymizationStatus && (
                   <span style={{ color: 'var(--t-400)' }}>
-                    Status: <strong style={{ color: 'var(--t-100)' }}>{preview.anonymizationStatus}</strong>
+                    Status:{' '}
+                    <strong style={{ color: 'var(--t-100)' }}>{preview.anonymizationStatus}</strong>
                   </span>
                 )}
                 {saveHint && (
-                  <span style={{ color: saveHint === 'Save error' ? '#f87171' : '#34d399' }}>{saveHint}</span>
+                  <span style={{ color: saveHint === 'Save error' ? '#dc2626' : '#0f766e' }}>
+                    {saveHint}
+                  </span>
                 )}
               </div>
 
@@ -679,7 +835,7 @@ export default function AnonymizedSampleDrawer({
                     borderRadius: '8px',
                     border: '1px solid rgba(245,158,11,0.3)',
                     background: 'rgba(245,158,11,0.08)',
-                    color: '#fbbf24',
+                    color: '#b45309',
                     fontSize: '12px',
                   }}
                 >
@@ -780,9 +936,9 @@ export default function AnonymizedSampleDrawer({
             flexWrap: 'wrap',
           }}
         >
-          {loading ? (
+          {loading || preparingMeta ? (
             <button className="btn btn-secondary" disabled style={actionBtn}>
-              Loading…
+              {preparingMeta ? 'Preparing…' : 'Loading…'}
             </button>
           ) : !hasDraft ? (
             <>

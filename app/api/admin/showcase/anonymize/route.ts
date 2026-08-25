@@ -23,6 +23,9 @@ import {
   upsertAnonymizedShowcaseMeta,
 } from '@/lib/db/homepageShowcase'
 import { normalizeDomain } from '@/lib/url/normalizeDomain'
+import { extractSourceSections } from '@/lib/anonymize/structure'
+import { missingMetadataMessages } from '@/lib/anonymize/sampleMetadataHelpers'
+import { suggestAnonymizedSampleMetadata } from '@/lib/anonymize/suggestSampleMetadata'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -192,6 +195,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, showcase: row, preview: publicSafePreview(row, report) })
     }
 
+    if (action === 'suggest_meta') {
+      const sectionsJson =
+        typeof report.sections_json === 'object' && report.sections_json
+          ? (report.sections_json as Record<string, unknown>)
+          : {}
+      const sourceSections = extractSourceSections(sectionsJson)
+      if (!Object.keys(sourceSections).length) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Source report has no sections to infer metadata from',
+            suggestion: {
+              genericLabel: null,
+              businessCategory: null,
+              publicLocation: null,
+            },
+          },
+          { status: 400 }
+        )
+      }
+
+      const result = await suggestAnonymizedSampleMetadata({
+        reportType,
+        websiteUrl: report.website_url,
+        sourceSections,
+      })
+
+      return NextResponse.json({
+        success: result.ok,
+        suggestion: result.suggestion,
+        aiCalls: result.aiCalls,
+        error: result.error || null,
+      })
+    }
+
     if (action === 'generate') {
       if (existing?.anonymization_status === 'generating') {
         return NextResponse.json(
@@ -217,8 +255,13 @@ export async function POST(req: NextRequest) {
         .slice(0, 120)
 
       if (!publicDisplayName || !businessCategory || !publicLocation) {
+        const messages = missingMetadataMessages({
+          genericLabel: publicDisplayName,
+          businessCategory,
+          publicLocation,
+        })
         return NextResponse.json(
-          { error: 'Generic company label, business category, and public location are required' },
+          { error: messages.join(' ') || 'Required sample metadata is missing.' },
           { status: 400 }
         )
       }

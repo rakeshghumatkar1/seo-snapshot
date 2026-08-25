@@ -3391,3 +3391,70 @@ body:has(.public-site) .noise-overlay {
 .admin-shell .admin-drawer-backdrop {
   background: rgba(15, 23, 42, 0.45) !important;
 }
+
+/* Admin checkbox polish (scoped) */
+.admin-shell input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(15, 23, 42, 0.28);
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: pointer;
+  vertical-align: middle;
+  position: relative;
+  transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.admin-shell input[type='checkbox']:hover:not(:disabled) {
+  border-color: rgba(15, 118, 110, 0.55);
+}
+
+.admin-shell input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.22);
+  border-color: var(--admin-primary, #0f766e);
+}
+
+.admin-shell input[type='checkbox']:checked {
+  background: var(--admin-primary, #0f766e);
+  border-color: var(--admin-primary, #0f766e);
+}
+
+.admin-shell input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.admin-shell input[type='checkbox']:indeterminate {
+  background: var(--admin-primary, #0f766e);
+  border-color: var(--admin-primary, #0f766e);
+}
+
+.admin-shell input[type='checkbox']:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 8px;
+  height: 2px;
+  background: #fff;
+  border: none;
+  transform: none;
+}
+
+.admin-shell input[type='checkbox']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}

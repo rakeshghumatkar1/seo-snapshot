@@ -1,10 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { sanitizeUrl } from '@/lib/url/sanitize';
 import ServiceConversionSection from '@/components/public/ServiceConversionSection';
+import HomepageUsageStats from '@/components/public/HomepageUsageStats';
+import HomepageSampleReports, {
+  type SampleReportCard,
+} from '@/components/public/HomepageSampleReports';
+import HomepageRecentBusinesses, {
+  type RecentBusiness,
+} from '@/components/public/HomepageRecentBusinesses';
 
 function isValidInput(url: string): boolean {
   const cleaned = url.trim();
@@ -67,6 +74,35 @@ function FeatureList({ items }: { items: string[] }) {
 export default function Home() {
   const [url, setUrl] = useState('');
   const router = useRouter();
+  const [usageStats, setUsageStats] = useState({
+    websitesAnalysed: 0,
+    reportsGenerated: 0,
+    detailedReportsCreated: 0,
+  });
+  const [sampleReports, setSampleReports] = useState<SampleReportCard[]>([]);
+  const [recentBusinesses, setRecentBusinesses] = useState<RecentBusiness[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/public/homepage-showcase')
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        setUsageStats({
+          websitesAnalysed: Number(data?.stats?.websitesAnalysed || 0),
+          reportsGenerated: Number(data?.stats?.reportsGenerated || 0),
+          detailedReportsCreated: Number(data?.stats?.detailedReportsCreated || 0),
+        });
+        setSampleReports(Array.isArray(data?.sampleReports) ? data.sampleReports : []);
+        setRecentBusinesses(
+          Array.isArray(data?.recentBusinesses) ? data.recentBusinesses : []
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,6 +222,8 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <HomepageUsageStats stats={usageStats} />
 
       {/* Benefits */}
       <section className="public-section-light public-section-compact">
@@ -343,6 +381,9 @@ export default function Home() {
           email.
         </p>
       </section>
+
+      <HomepageSampleReports samples={sampleReports} />
+      <HomepageRecentBusinesses businesses={recentBusinesses} />
 
       <ServiceConversionSection />
     </div>

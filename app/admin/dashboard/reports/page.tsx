@@ -62,6 +62,22 @@ export default function ReportsLibraryPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<ReportRow | null>(null)
+  const [showcaseReport, setShowcaseReport] = useState<ReportRow | null>(null)
+  const [showcaseLoading, setShowcaseLoading] = useState(false)
+  const [showcaseSaving, setShowcaseSaving] = useState(false)
+  const [showcaseError, setShowcaseError] = useState<string | null>(null)
+  const [showcaseForm, setShowcaseForm] = useState({
+    isActive: false,
+    useAsSample: false,
+    showRecentlyAnalysed: false,
+    showDomain: false,
+    featured: false,
+    displayOrder: 0,
+    publicDisplayName: '',
+    publicDomain: '',
+    businessCategory: '',
+    slug: '',
+  })
 
   const loadReports = useCallback(async () => {
     setLoading(true)
@@ -117,6 +133,93 @@ export default function ReportsLibraryPage() {
       setError(err?.message || 'Failed to delete report')
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  async function openShowcase(report: ReportRow) {
+    setShowcaseReport(report)
+    setShowcaseError(null)
+    setShowcaseLoading(true)
+    const host = report.website_url
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split('/')[0] || ''
+    setShowcaseForm({
+      isActive: false,
+      useAsSample: false,
+      showRecentlyAnalysed: false,
+      showDomain: false,
+      featured: false,
+      displayOrder: 0,
+      publicDisplayName: '',
+      publicDomain: host,
+      businessCategory: '',
+      slug: '',
+    })
+    try {
+      const res = await fetch(`/api/admin/showcase?reportId=${encodeURIComponent(report.id)}`, {
+        cache: 'no-store',
+      })
+      if (res.status === 401) {
+        router.push('/admin')
+        return
+      }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load showcase settings')
+      const sc = data.showcase
+      if (sc) {
+        setShowcaseForm({
+          isActive: Boolean(sc.is_active),
+          useAsSample: Boolean(sc.use_as_sample),
+          showRecentlyAnalysed: Boolean(sc.show_recently_analysed),
+          showDomain: Boolean(sc.show_domain),
+          featured: Boolean(sc.featured),
+          displayOrder: Number(sc.display_order || 0),
+          publicDisplayName: String(sc.public_display_name || ''),
+          publicDomain: String(sc.public_domain || host),
+          businessCategory: String(sc.business_category || ''),
+          slug: String(sc.slug || ''),
+        })
+      }
+    } catch (err: any) {
+      setShowcaseError(err?.message || 'Failed to load showcase settings')
+    } finally {
+      setShowcaseLoading(false)
+    }
+  }
+
+  async function saveShowcase() {
+    if (!showcaseReport) return
+    setShowcaseSaving(true)
+    setShowcaseError(null)
+    try {
+      const res = await fetch('/api/admin/showcase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportId: showcaseReport.id,
+          isActive: showcaseForm.isActive,
+          useAsSample: showcaseForm.useAsSample,
+          showRecentlyAnalysed: showcaseForm.showRecentlyAnalysed,
+          showDomain: showcaseForm.showDomain,
+          featured: showcaseForm.featured,
+          displayOrder: showcaseForm.displayOrder,
+          publicDisplayName: showcaseForm.publicDisplayName,
+          publicDomain: showcaseForm.publicDomain,
+          businessCategory: showcaseForm.businessCategory,
+          slug: showcaseForm.slug,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save showcase settings')
+      if (data.showcase?.slug) {
+        setShowcaseForm((prev) => ({ ...prev, slug: data.showcase.slug }))
+      }
+      setShowcaseReport(null)
+    } catch (err: any) {
+      setShowcaseError(err?.message || 'Failed to save showcase settings')
+    } finally {
+      setShowcaseSaving(false)
     }
   }
 
@@ -248,6 +351,7 @@ export default function ReportsLibraryPage() {
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
                         <button className="btn btn-secondary" onClick={() => setViewing(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>View Report</button>
+                        <button className="btn btn-secondary" onClick={() => openShowcase(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>Homepage Showcase</button>
                         <a href={`/api/admin/reports/${row.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ fontSize: '10px', padding: '5px 9px', textDecoration: 'none' }}>View PDF</a>
                         <a href={`/api/admin/reports/${row.id}/pdf?download=1`} className="btn btn-secondary" style={{ fontSize: '10px', padding: '5px 9px', textDecoration: 'none' }}>Download</a>
                         <button disabled={actionLoading} onClick={() => deleteReport(row)} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.28)', background: 'transparent', color: '#f87171', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>Delete</button>
@@ -298,6 +402,135 @@ export default function ReportsLibraryPage() {
             <div style={{ padding: '14px 22px 18px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--glass-border)' }}>
               <a href={`/api/admin/reports/${viewing.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: '12px' }}>View PDF</a>
               <a href={`/api/admin/reports/${viewing.id}/pdf?download=1`} className="btn btn-primary" style={{ textDecoration: 'none', fontSize: '12px' }}>Download PDF</a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showcaseReport && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 280, background: 'rgba(0,0,0,0.76)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '560px', maxHeight: '90vh', borderRadius: '12px', border: '1px solid var(--glass-border)', background: '#0f1117', boxShadow: '0 24px 70px rgba(0,0,0,0.45)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--t-100)', fontSize: '16px' }}>Homepage Showcase</div>
+                <div style={{ fontSize: '11px', color: 'var(--t-400)', marginTop: '3px' }}>
+                  {showcaseReport.report_type.toUpperCase()} · {showcaseReport.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                </div>
+              </div>
+              <button onClick={() => setShowcaseReport(null)} style={{ background: 'none', border: 'none', color: 'var(--t-400)', fontSize: '22px', cursor: 'pointer' }}>×</button>
+            </div>
+
+            <div style={{ padding: '20px 22px', overflowY: 'auto' }}>
+              <p style={{ fontSize: '12px', color: 'var(--t-400)', lineHeight: 1.55, marginBottom: '16px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                Only the public display information and approved report content will be visible. Lead name/email and internal metadata are never published.
+              </p>
+
+              {showcaseLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}><div className="loader" style={{ margin: '0 auto' }} /></div>
+              ) : (
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {[
+                    { key: 'isActive', label: 'Publish / active on homepage' },
+                    { key: 'useAsSample', label: 'Use as Sample Report' },
+                    { key: 'showRecentlyAnalysed', label: 'Show in Recently Analysed' },
+                    { key: 'showDomain', label: 'Show public domain' },
+                    { key: 'featured', label: 'Featured (sort first)' },
+                  ].map((item) => (
+                    <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--t-200)', fontSize: '13px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean((showcaseForm as any)[item.key])}
+                        onChange={(e) =>
+                          setShowcaseForm((prev) => ({ ...prev, [item.key]: e.target.checked }))
+                        }
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+
+                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Public Display Name
+                    <input
+                      value={showcaseForm.publicDisplayName}
+                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, publicDisplayName: e.target.value }))}
+                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
+                      placeholder="e.g. Think Big Digital"
+                    />
+                  </label>
+
+                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Public Domain
+                    <input
+                      value={showcaseForm.publicDomain}
+                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, publicDomain: e.target.value }))}
+                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
+                      placeholder="thinkbigdigital.co"
+                    />
+                  </label>
+
+                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Business Category
+                    <input
+                      value={showcaseForm.businessCategory}
+                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, businessCategory: e.target.value }))}
+                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
+                      placeholder="e.g. Digital Marketing"
+                    />
+                  </label>
+
+                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Public Slug
+                    <input
+                      value={showcaseForm.slug}
+                      onChange={(e) => setShowcaseForm((prev) => ({ ...prev, slug: e.target.value }))}
+                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal' }}
+                      placeholder="think-big-digital-seo-growth"
+                    />
+                  </label>
+
+                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', color: 'var(--t-400)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Display Order
+                    <input
+                      type="number"
+                      min={0}
+                      max={9999}
+                      value={showcaseForm.displayOrder}
+                      onChange={(e) =>
+                        setShowcaseForm((prev) => ({
+                          ...prev,
+                          displayOrder: Number(e.target.value || 0),
+                        }))
+                      }
+                      style={{ ...controlStyle, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal', width: '120px' }}
+                    />
+                  </label>
+
+                  {showcaseForm.slug && showcaseForm.isActive && showcaseForm.useAsSample && (
+                    <a
+                      href={`/sample-report/${encodeURIComponent(showcaseForm.slug)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-secondary"
+                      style={{ textDecoration: 'none', fontSize: '12px', justifySelf: 'start' }}
+                    >
+                      Preview Public Version →
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {showcaseError && (
+                <div style={{ marginTop: '14px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: '12px', fontWeight: 600 }}>
+                  {showcaseError}
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '14px 22px 18px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--glass-border)' }}>
+              <button className="btn btn-secondary" onClick={() => setShowcaseReport(null)} style={{ fontSize: '12px' }}>Cancel</button>
+              <button className="btn btn-primary" disabled={showcaseLoading || showcaseSaving} onClick={saveShowcase} style={{ fontSize: '12px' }}>
+                {showcaseSaving ? 'Saving…' : 'Save Showcase'}
+              </button>
             </div>
           </div>
         </div>

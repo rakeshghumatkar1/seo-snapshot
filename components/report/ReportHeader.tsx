@@ -11,19 +11,34 @@ interface ReportHeaderProps {
   websiteUrl: string
   reportType: 'snapshot' | 'detailed'
   generatedAt?: Date
+  /** Override “Prepared for” label (e.g. public sample display name). */
+  preparedFor?: string
+  /** Override analysed website URL; pass null to hide the row. */
+  analysedUrl?: string | null
+  isSample?: boolean
 }
 
 export default function ReportHeader({
   websiteUrl,
   reportType,
   generatedAt,
+  preparedFor,
+  analysedUrl,
+  isSample = false,
 }: ReportHeaderProps) {
   const title = reportDocumentTitle(reportType)
-  const domain = displayDomain(websiteUrl)
+  const domain = preparedFor?.trim() || displayDomain(websiteUrl)
   const dateLabel = formatReportDate(generatedAt || new Date())
+  const showAnalysed =
+    analysedUrl === undefined ? true : analysedUrl !== null && analysedUrl !== ''
+  const analysedValue =
+    analysedUrl === undefined ? websiteUrl : analysedUrl || ''
 
   return (
     <header className="report-doc-header" aria-labelledby="report-doc-title">
+      {isSample && (
+        <p className="report-doc-sample-label">Sample Report</p>
+      )}
       <div className="report-doc-header-brand">
         <BrandLogo size="header" className="report-doc-logo" />
         <div className="report-doc-brand-text">
@@ -48,10 +63,12 @@ export default function ReportHeader({
           <dt>Generated</dt>
           <dd>{dateLabel}</dd>
         </div>
-        <div>
-          <dt>Analysed website</dt>
-          <dd className="report-doc-url">{websiteUrl}</dd>
-        </div>
+        {showAnalysed && (
+          <div>
+            <dt>Analysed website</dt>
+            <dd className="report-doc-url">{analysedValue}</dd>
+          </div>
+        )}
       </dl>
     </header>
   )

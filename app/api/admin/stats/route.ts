@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
-import { ensureLeadManagementSchema } from '@/lib/admin/leadManagement'
 import { dbQuery } from '@/lib/db/client'
 
 export async function GET(req: NextRequest) {
@@ -13,8 +12,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await ensureLeadManagementSchema()
-
     const [
       leadsResult,
       ratingsResult,
@@ -27,13 +24,10 @@ export async function GET(req: NextRequest) {
       todayActivityResult,
     ] = await Promise.all([
       dbQuery(
-        `SELECT
-          COUNT(*) FILTER (WHERE is_test = FALSE) as total,
-          COUNT(*) as raw_total,
-          COUNT(*) FILTER (WHERE is_test = TRUE) as test_count,
-          COUNT(DISTINCT website_url) FILTER (WHERE is_test = FALSE) as company_count,
-          COUNT(*) FILTER (WHERE is_test = FALSE AND requested_report_type = 'pdf') as pdf_count,
-          COUNT(*) FILTER (WHERE is_test = FALSE AND requested_report_type = 'detailed') as detailed_count
+        `SELECT COUNT(*) as total,
+          COUNT(DISTINCT website_url) as company_count,
+          COUNT(CASE WHEN requested_report_type = 'pdf' THEN 1 END) as pdf_count,
+          COUNT(CASE WHEN requested_report_type = 'detailed' THEN 1 END) as detailed_count
          FROM leads`
       ),
       dbQuery(
@@ -57,8 +51,7 @@ export async function GET(req: NextRequest) {
       dbQuery(
         `SELECT DATE(created_at) as date, COUNT(*) as count
          FROM leads
-         WHERE is_test = FALSE
-           AND created_at > NOW() - INTERVAL '7 days'
+         WHERE created_at > NOW() - INTERVAL '7 days'
          GROUP BY DATE(created_at)
          ORDER BY date ASC`
       ),
@@ -72,7 +65,6 @@ export async function GET(req: NextRequest) {
       dbQuery(
         `SELECT website_url, COUNT(*) as count
          FROM leads
-         WHERE is_test = FALSE
          GROUP BY website_url
          ORDER BY count DESC
          LIMIT 10`
@@ -96,8 +88,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       leads: {
         total: Number(leadsResult[0]?.total || 0),
-        rawTotal: Number(leadsResult[0]?.raw_total || 0),
-        testCount: Number(leadsResult[0]?.test_count || 0),
         companyCount: Number(leadsResult[0]?.company_count || 0),
         pdfCount: Number(leadsResult[0]?.pdf_count || 0),
         detailedCount: Number(leadsResult[0]?.detailed_count || 0),

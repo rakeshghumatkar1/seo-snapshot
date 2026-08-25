@@ -67,7 +67,8 @@ export default function SampleReportDocument({
       ) : null}
 
       <div className="report-doc-sections">
-        {iterableSectionEntries(data.sections).map(([key, value], index) => {
+        {iterableSectionEntries(data.sections, data.reportType, reportVersion).map(
+          ([key, value], index) => {
           const label = getSectionLabel(key, data.reportType, reportVersion)
           return (
             <div key={key} className={`fade-up delay-${Math.min(index, 7)}`}>

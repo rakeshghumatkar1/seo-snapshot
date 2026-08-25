@@ -65,6 +65,22 @@ export const DETAILED_V2_SECTION_LABELS: Record<keyof DetailedSectionsV2, Sectio
 
 const META_KEYS = new Set(['reportVersion'])
 
+function orderedKeysForSections(sections: Record<string, unknown>): string[] | null {
+  if (typeof sections.executiveBusinessAssessment === 'string') {
+    return Object.keys(DETAILED_V3_SECTION_LABELS)
+  }
+  if (typeof sections.businessCustomerUnderstanding === 'string') {
+    return Object.keys(SNAPSHOT_V3_SECTION_LABELS)
+  }
+  if (typeof sections.websitePositioning === 'string') {
+    return Object.keys(DETAILED_V2_SECTION_LABELS)
+  }
+  if (typeof sections.introduction === 'string') {
+    return Object.keys(SNAPSHOT_V2_SECTION_LABELS)
+  }
+  return null
+}
+
 export function getSectionLabel(
   key: string,
   reportType: 'snapshot' | 'detailed',
@@ -104,10 +120,33 @@ export function getSectionLabel(
 }
 
 export function iterableSectionEntries(
-  sections: Record<string, unknown>
+  sections: Record<string, unknown>,
+  reportType?: 'snapshot' | 'detailed',
+  version?: 2 | 3
 ): Array<[string, string]> {
-  return Object.entries(sections).filter(([key, value]) => {
+  const entries = Object.entries(sections).filter(([key, value]) => {
     if (META_KEYS.has(key)) return false
     return typeof value === 'string' && value.trim().length > 10
   }) as Array<[string, string]>
+
+  let order: string[] | null = null
+  if (version === 3 && reportType === 'detailed') order = Object.keys(DETAILED_V3_SECTION_LABELS)
+  else if (version === 3 && reportType === 'snapshot') order = Object.keys(SNAPSHOT_V3_SECTION_LABELS)
+  else if (version === 2 && reportType === 'detailed') order = Object.keys(DETAILED_V2_SECTION_LABELS)
+  else if (version === 2 && reportType === 'snapshot') order = Object.keys(SNAPSHOT_V2_SECTION_LABELS)
+  else order = orderedKeysForSections(sections)
+
+  if (!order?.length) return entries
+
+  const map = new Map(entries)
+  const ordered: Array<[string, string]> = []
+  for (const key of order) {
+    const value = map.get(key)
+    if (typeof value === 'string') {
+      ordered.push([key, value])
+      map.delete(key)
+    }
+  }
+  for (const [key, value] of map) ordered.push([key, value])
+  return ordered
 }

@@ -35,6 +35,24 @@ const DETAILED_KEYS: Array<[string, DetailedKey]> = [
   ['EVIDENCE_LIMITATIONS:', 'evidenceLimitations'],
 ]
 
+export const SNAPSHOT_SECTION_MARKERS_V3 = SNAPSHOT_KEYS.map(([marker]) => marker)
+export const DETAILED_SECTION_MARKERS_V3 = DETAILED_KEYS.map(([marker]) => marker)
+
+export type DetailedMarkerValidation = {
+  valid: boolean
+  missing: string[]
+}
+
+/** Structural check: all required Detailed V3 markers present in raw text. */
+export function validateDetailedMarkers(raw: string): DetailedMarkerValidation {
+  const text = String(raw || '')
+  const missing = DETAILED_SECTION_MARKERS_V3.filter(marker => !text.includes(marker))
+  return {
+    valid: missing.length === 0,
+    missing,
+  }
+}
+
 function extractSections<T extends string>(raw: string, keys: Array<[string, T]>): Record<T, string> {
   const result = {} as Record<T, string>
   const positions = keys
@@ -84,11 +102,17 @@ export function parseSnapshotReportV3(raw: string): SnapshotSectionsV3 | null {
 }
 
 export function parseDetailedReportV3(raw: string): DetailedSectionsV3 | null {
-  const sections = extractSections(raw, DETAILED_KEYS) as DetailedSectionsV3
-  const missing = DETAILED_KEYS.filter(([, key]) => !sections[key]).map(([marker]) => marker)
+  const markerCheck = validateDetailedMarkers(raw)
+  if (!markerCheck.valid) {
+    console.error('[ParserV3] Detailed missing markers:', markerCheck.missing.join(', '))
+    return null
+  }
 
-  if (missing.length > 0) {
-    console.error('[ParserV3] Detailed missing markers:', missing.join(', '))
+  const sections = extractSections(raw, DETAILED_KEYS) as DetailedSectionsV3
+  const emptyBodies = DETAILED_KEYS.filter(([, key]) => !sections[key]).map(([marker]) => marker)
+
+  if (emptyBodies.length > 0) {
+    console.error('[ParserV3] Detailed empty section bodies:', emptyBodies.join(', '))
     return null
   }
 
@@ -99,6 +123,3 @@ export function parseDetailedReportV3(raw: string): DetailedSectionsV3 | null {
 
   return sections
 }
-
-export const SNAPSHOT_SECTION_MARKERS_V3 = SNAPSHOT_KEYS.map(([marker]) => marker)
-export const DETAILED_SECTION_MARKERS_V3 = DETAILED_KEYS.map(([marker]) => marker)

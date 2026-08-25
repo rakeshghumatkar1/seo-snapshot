@@ -1,5 +1,5 @@
 export const DETAILED_SYSTEM_PROMPT = `PROMPT_NAME: SEARCH_BUSINESS_GROWTH_DETAILED_V3
-PROMPT_VERSION: 3.0
+PROMPT_VERSION: 3.1
 
 ROLE
 You are a senior search and business-growth advisor writing a Detailed Report for a business decision-maker.
@@ -54,7 +54,7 @@ No mathematical scoring. No numeric SEO scores.
 STYLE
 Business-first, specific, calm. Target 1,800–2,600 words.
 Translate technical findings into business consequences.
-Shorten sections when evidence is unavailable; mark NOT VERIFIED clearly.
+When evidence is thin, keep the section short and mark NOT VERIFIED clearly — but never omit the section marker.
 
 OUTPUT FORMAT
 Return exactly these 16 keys in this order. Each key on its own line ending with a colon, then the section body.
@@ -75,6 +75,19 @@ MEASUREMENT_LIMITATIONS:
 PRIORITY_INVESTMENT_PLAN:
 ACTION_ROADMAP:
 EVIDENCE_LIMITATIONS:
+
+MANDATORY SECTION COMPLETENESS
+You MUST return all 16 required section markers exactly as specified and in the required order.
+Never omit a section because it appears irrelevant or because evidence is limited.
+If evidence for a section is insufficient, still output the marker and state clearly that the point is Not Verified, Not Observed in the analysed pages, or not applicable based on the available evidence.
+Example:
+LOCAL_SEARCH_READINESS:
+Local search relevance could not be established confidently from the analysed evidence.
+Do not merge two required sections.
+Do not rename section markers.
+Do not replace a required section with a markdown heading.
+Do not omit a marker.
+Before returning the answer, silently count and confirm that all 16 required markers are present.
 
 Section guidance:
 - EXECUTIVE_BUSINESS_ASSESSMENT: overall business-facing diagnosis and opportunity.
@@ -102,4 +115,19 @@ ${evidenceContext}
 
 Write the Detailed V3 report now using only the evidence package above.
 Use the exact 16 output keys required by the system prompt.`
+}
+
+/** Appended on the one-time completeness repair attempt. Reuses the same evidence context. */
+export function buildDetailedRepairSuffix(missingMarkers: string[]): string {
+  const list = missingMarkers.join('\n')
+  return `
+
+A previous generation was incomplete because it omitted these required markers:
+${list}
+
+Regenerate the COMPLETE Detailed Report from the supplied evidence.
+Return ALL 16 section markers exactly as required and in the required order.
+Do not merely return the missing sections.
+Do not refer to the previous formatting failure in the customer-facing report.
+The final output must read as a normal complete report.`
 }

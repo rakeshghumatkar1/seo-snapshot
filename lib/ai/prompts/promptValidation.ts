@@ -16,5 +16,6 @@ export function isValidDetailedV3Prompt(content: string): boolean {
     'AI_DISCOVERY_READINESS:',
     'PRIORITY_INVESTMENT_PLAN:',
     'ACTION_ROADMAP:',
+    'MANDATORY SECTION COMPLETENESS',
   ].every(marker => text.includes(marker))
 }

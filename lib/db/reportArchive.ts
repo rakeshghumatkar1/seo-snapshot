@@ -42,19 +42,19 @@ export async function insertArchivedReport({
   reportType: string
   email?: string
   status: string
-  sectionsJson: Record<string, string>
+  sectionsJson: object
 }) {
   await ensureReportArchiveSchema()
 
   let pdfBase64: string | null = null
   let pdfFilename: string | null = null
-  let pdfGeneratedAt: Date | null = null
+  let pdfGeneratedAt: string | null = null
 
   try {
     const pdf = buildPDFBuffer({ websiteUrl, reportType, sections: sectionsJson })
     pdfBase64 = pdf.toString('base64')
     pdfFilename = reportPDFFilename(websiteUrl, reportType)
-    pdfGeneratedAt = new Date()
+    pdfGeneratedAt = new Date().toISOString()
   } catch (err) {
     console.error('[Report Archive] PDF generation failed:', err)
   }

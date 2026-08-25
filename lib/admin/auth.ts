@@ -1,7 +1,20 @@
 import { cookies } from 'next/headers'
 
-const COOKIE_NAME = 'admin_session'
-const SESSION_DURATION = 2 * 60 * 60 * 1000
+export const COOKIE_NAME = 'admin_session'
+
+/** Shared Admin session lifetime: 30 days (seconds). Cookie maxAge and token expiry both use this. */
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+const SESSION_DURATION_MS = SESSION_MAX_AGE_SECONDS * 1000
+
+export function getAdminSessionCookieOptions(maxAge: number = SESSION_MAX_AGE_SECONDS) {
+  return {
+    httpOnly: true as const,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge,
+    path: '/',
+  }
+}
 
 export function verifyAdminPassword(password: string): boolean {
   if (!process.env.ADMIN_PASSWORD?.trim()) {
@@ -30,7 +43,7 @@ export function verifySessionToken(token: string): boolean {
     }
 
     const age = Date.now() - Number(timestamp)
-    return age < SESSION_DURATION
+    return age >= 0 && age < SESSION_DURATION_MS
   } catch {
     return false
   }
@@ -42,5 +55,3 @@ export async function isAdminAuthenticated(): Promise<boolean> {
   if (!session) return false
   return verifySessionToken(session.value)
 }
-
-export { COOKIE_NAME }

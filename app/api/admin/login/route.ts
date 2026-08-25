@@ -3,6 +3,8 @@ import {
   verifyAdminPassword,
   generateSessionToken,
   COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+  getAdminSessionCookieOptions,
 } from '@/lib/admin/auth'
 
 export async function POST(req: NextRequest) {
@@ -37,13 +39,11 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({ success: true })
 
-    response.cookies.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 2 * 60 * 60,
-      path: '/',
-    })
+    response.cookies.set(
+      COOKIE_NAME,
+      token,
+      getAdminSessionCookieOptions(SESSION_MAX_AGE_SECONDS)
+    )
 
     return response
   } catch (err) {

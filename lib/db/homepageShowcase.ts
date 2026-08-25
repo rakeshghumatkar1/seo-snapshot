@@ -8,6 +8,7 @@ import {
   buildCoverageMarkets,
   type HomepageCoverageMarket,
 } from '@/lib/homepage/coverageMarkets'
+import { deriveSamplePreviewText } from '@/lib/public/samplePreviewExcerpt'
 
 let schemaPromise: Promise<void> | null = null
 
@@ -103,6 +104,7 @@ export type ShowcasePublicSample = {
   publicLocation: string | null
   sampleContentMode: 'source' | 'anonymized'
   featured: boolean
+  previewText: string | null
 }
 
 export type { HomepageCoverageMarket }
@@ -128,7 +130,8 @@ export async function getPublicHomepageShowcase(): Promise<{
         hs.sample_content_mode,
         hs.anonymization_status,
         hs.anonymized_sections_json,
-        r.report_type
+        r.report_type,
+        r.sections_json
       FROM homepage_showcase hs
       INNER JOIN reports r ON r.id = hs.report_id
       WHERE hs.is_active = TRUE
@@ -152,7 +155,8 @@ export async function getPublicHomepageShowcase(): Promise<{
         hs.sample_content_mode,
         hs.anonymization_status,
         hs.anonymized_sections_json,
-        r.report_type
+        r.report_type,
+        r.sections_json
       FROM homepage_showcase hs
       INNER JOIN reports r ON r.id = hs.report_id
       WHERE hs.is_active = TRUE
@@ -172,16 +176,33 @@ export async function getPublicHomepageShowcase(): Promise<{
     sampleReports: samples.map((row: any) => {
       const mode = row.sample_content_mode === 'anonymized' ? 'anonymized' : 'source'
       const showDomain = mode === 'anonymized' ? false : Boolean(row.show_domain)
+      const reportType = (row.report_type === 'detailed' ? 'detailed' : 'snapshot') as
+        | 'snapshot'
+        | 'detailed'
+      const displayName = String(row.public_display_name || '')
+      const rawSections =
+        mode === 'anonymized' ? row.anonymized_sections_json : row.sections_json
+      const sectionMap: Record<string, string> = {}
+      if (rawSections && typeof rawSections === 'object') {
+        for (const [k, v] of Object.entries(rawSections as Record<string, unknown>)) {
+          if (typeof v === 'string') sectionMap[k] = v
+        }
+      }
+      const previewSource =
+        mode === 'anonymized' && displayName.trim()
+          ? normalizeAnonymizedBusinessReferences(sectionMap, displayName)
+          : sectionMap
       return {
         slug: row.slug,
         displayName: row.public_display_name,
         domain: showDomain ? row.public_domain || null : null,
         showDomain,
-        reportType: row.report_type === 'detailed' ? 'detailed' : 'snapshot',
+        reportType,
         businessCategory: row.business_category || null,
         publicLocation: row.public_location || null,
         sampleContentMode: mode as 'source' | 'anonymized',
         featured: Boolean(row.featured),
+        previewText: deriveSamplePreviewText(previewSource, { reportType }),
       }
     }),
     // Coverage is always derived from published anonymised samples only (never source-mode).

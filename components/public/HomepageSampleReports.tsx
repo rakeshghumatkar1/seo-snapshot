@@ -13,6 +13,7 @@ export type SampleReportCard = {
   publicLocation?: string | null
   sampleContentMode?: 'source' | 'anonymized'
   featured?: boolean
+  previewText?: string | null
 }
 
 function ReportThumbnail({
@@ -23,17 +24,43 @@ function ReportThumbnail({
   reportType: 'snapshot' | 'detailed'
 }) {
   const initial = (displayName.trim()[0] || 'S').toUpperCase()
+  const title =
+    displayName.trim().length > 42 ? `${displayName.trim().slice(0, 40).trim()}…` : displayName.trim()
+
   return (
     <div className="public-sample-thumb" aria-hidden="true">
       <div className="public-sample-thumb-doc">
-        <div className="public-sample-thumb-bar" />
-        <div className="public-sample-thumb-line long" />
-        <div className="public-sample-thumb-line mid" />
-        <div className="public-sample-thumb-line short" />
-        <div className="public-sample-thumb-badge">
-          {reportType === 'detailed' ? 'Detailed' : 'Snapshot'}
+        <div className="public-sample-thumb-header">
+          <div className="public-sample-thumb-brand">
+            <span className="public-sample-thumb-mark">{initial}</span>
+            <span className="public-sample-thumb-brand-text">SEO Snapshot</span>
+          </div>
+          <span
+            className={`public-sample-thumb-pill ${
+              reportType === 'detailed' ? 'is-detailed' : 'is-snapshot'
+            }`}
+          >
+            {reportType === 'detailed' ? 'Detailed' : 'Snapshot'}
+          </span>
         </div>
-        <span className="public-sample-thumb-initial">{initial}</span>
+        <div className="public-sample-thumb-title">{title || 'Sample Report'}</div>
+        <div className="public-sample-thumb-meta">
+          <span />
+          <span />
+        </div>
+        <div className="public-sample-thumb-blocks">
+          <div className="public-sample-thumb-block">
+            <div className="public-sample-thumb-kicker" />
+            <div className="public-sample-thumb-line long" />
+            <div className="public-sample-thumb-line mid" />
+            <div className="public-sample-thumb-line short" />
+          </div>
+          <div className="public-sample-thumb-block">
+            <div className="public-sample-thumb-kicker" />
+            <div className="public-sample-thumb-line mid" />
+            <div className="public-sample-thumb-line short" />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -115,11 +142,14 @@ export default function HomepageSampleReports({
                   {sample.businessCategory ? (
                     <p className="public-sample-category">{sample.businessCategory}</p>
                   ) : null}
+                  {sample.previewText ? (
+                    <p className="public-sample-excerpt">{sample.previewText}</p>
+                  ) : null}
                   <Link
                     href={`/sample-report/${encodeURIComponent(sample.slug)}`}
                     className="public-sample-link"
                   >
-                    View Sample Report →
+                    View Report →
                   </Link>
                 </div>
               </article>

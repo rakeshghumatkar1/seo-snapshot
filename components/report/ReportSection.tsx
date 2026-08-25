@@ -1,51 +1,71 @@
+import { splitReportContent } from '@/lib/report/presentation'
+
 interface ReportSectionProps {
-  title: string;
-  category: string;
-  content: string;
+  title: string
+  category: string
+  content: string
+  sectionNumber?: string
+  emphasized?: boolean
 }
 
-export default function ReportSection({ title, category, content }: ReportSectionProps) {
+export default function ReportSection({
+  title,
+  category,
+  content,
+  sectionNumber,
+  emphasized = false,
+}: ReportSectionProps) {
+  const blocks = splitReportContent(content)
+
   return (
-    <div className="glass p-8 mb-4">
-      <div className="accent-bar">
-        <p
-          style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: '11px',
-            fontWeight: 600,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase' as const,
-            color: 'var(--t-400)',
-            marginBottom: '4px',
-          }}
-        >
-          {category}
-        </p>
-        <h2
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '20px',
-            fontWeight: 600,
-            color: 'var(--t-100)',
-            letterSpacing: '-0.01em',
-            lineHeight: 1.3,
-          }}
-        >
-          {title}
-        </h2>
+    <section
+      className={`report-section${emphasized ? ' report-section-emphasis' : ''}`}
+      aria-labelledby={sectionNumber ? `report-section-${sectionNumber}` : undefined}
+    >
+      <header className="report-section-head">
+        {sectionNumber ? (
+          <span className="report-section-number" aria-hidden="true">
+            {sectionNumber}
+          </span>
+        ) : null}
+        <div className="report-section-titles">
+          <p className="report-section-category">{category}</p>
+          <h2
+            id={sectionNumber ? `report-section-${sectionNumber}` : undefined}
+            className="report-section-title"
+          >
+            {title}
+          </h2>
+        </div>
+      </header>
+
+      <div className="report-section-body">
+        {blocks.map((block, index) => {
+          if (block.type === 'stage') {
+            return (
+              <div key={`stage-${index}`} className="report-stage">
+                <p className="report-stage-label">{block.label}</p>
+                {block.text ? <p className="report-stage-text">{block.text}</p> : null}
+              </div>
+            )
+          }
+
+          if (block.type === 'priority') {
+            return (
+              <div key={`priority-${index}`} className="report-priority">
+                <p className="report-priority-label">Priority {block.index}</p>
+                <p className="report-priority-text">{block.text}</p>
+              </div>
+            )
+          }
+
+          return (
+            <p key={`p-${index}`} className="report-paragraph">
+              {block.text}
+            </p>
+          )
+        })}
       </div>
-      <div
-        className="mt-5"
-        style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: '16px',
-          color: 'var(--t-200)',
-          lineHeight: 1.8,
-          whiteSpace: 'pre-line' as const,
-        }}
-      >
-        {content}
-      </div>
-    </div>
-  );
+    </section>
+  )
 }

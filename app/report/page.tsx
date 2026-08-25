@@ -6,6 +6,7 @@ import { ReportResponse, detectReportVersion } from '@/types/report';
 import { FeatureConfig } from '@/types/config';
 import ReportHeader from '@/components/report/ReportHeader';
 import ReportSection from '@/components/report/ReportSection';
+import ReportFooter from '@/components/report/ReportFooter';
 import RatingBlock from '@/components/report/RatingBlock';
 import CTABlock from '@/components/report/CTABlock';
 import ServiceHelpCTA from '@/components/public/ServiceHelpCTA';
@@ -14,6 +15,7 @@ import {
   getSectionLabel,
   iterableSectionEntries,
 } from '@/lib/report/sectionLabels';
+import { formatSectionNumber, isEmphasizedSection } from '@/lib/report/presentation';
 
 
 export default function ReportPage() {
@@ -325,8 +327,7 @@ function ReportContent() {
   );
 
   return (
-    <div className="public-page-content max-w-3xl mx-auto px-6 py-16">
-      {/* Report Header */}
+    <div className="public-page-content report-doc max-w-3xl mx-auto px-5 sm:px-6 py-10 sm:py-14">
       <ReportHeader websiteUrl={report.websiteUrl} reportType={report.type} />
 
       {modalError && (
@@ -335,27 +336,30 @@ function ReportContent() {
         </p>
       )}
 
-      {/* Section Cards */}
-      {iterableSectionEntries(report.sections as unknown as Record<string, unknown>).map(
-        ([key, value], index) => {
-          const label = getSectionLabel(key, report.type, reportVersion);
-          return (
-            <div key={key} className={`fade-up delay-${Math.min(index, 7)}`}>
-              <ReportSection
-                category={label.category}
-                title={label.title}
-                content={value}
-              />
-            </div>
-          );
-        }
-      )}
+      <div className="report-doc-sections">
+        {iterableSectionEntries(report.sections as unknown as Record<string, unknown>).map(
+          ([key, value], index) => {
+            const label = getSectionLabel(key, report.type, reportVersion);
+            return (
+              <div key={key} className={`fade-up delay-${Math.min(index, 7)}`}>
+                <ReportSection
+                  category={label.category}
+                  title={label.title}
+                  content={value}
+                  sectionNumber={formatSectionNumber(index)}
+                  emphasized={isEmphasizedSection(key, report.type, reportVersion)}
+                />
+              </div>
+            );
+          }
+        )}
+      </div>
 
       {/* Action Bar */}
-      <div className="glass p-6 mt-8 mb-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+      <div className="report-doc-actions">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center">
           {report.type === 'snapshot' && config?.enableDetailedReport && (
-            <button onClick={handleGenerateDetailed} className="btn btn-primary btn-lg pulse w-full sm:w-auto justify-center">
+            <button onClick={handleGenerateDetailed} className="btn btn-primary btn-lg w-full sm:w-auto justify-center">
               Get My Free Detailed Report →
             </button>
           )}
@@ -367,26 +371,20 @@ function ReportContent() {
               Download Full Report PDF →
             </button>
           )}
-          {report.type === 'detailed' && capturedEmail && (
-            <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--t-400)', marginTop: '-4px' }}>
-              Downloading as {capturedEmail}
-            </p>
-          )}
         </div>
+        {report.type === 'detailed' && capturedEmail && (
+          <p className="report-doc-actions-note">
+            Downloading as {capturedEmail}
+          </p>
+        )}
+        {report.type === 'snapshot' && (
+          <p className="report-doc-actions-note">
+            Detailed report requires email
+          </p>
+        )}
       </div>
-      {report.type === 'snapshot' && (
-        <p className="text-center mb-4" style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-400)' }}>
-          Detailed report requires email
-        </p>
-      )}
 
-      {report.type === 'snapshot' && (
-        <ServiceHelpCTA variant="compact" />
-      )}
-
-      {report.type === 'detailed' && (
-        <ServiceHelpCTA variant="full" />
-      )}
+      <ServiceHelpCTA variant={report.type === 'snapshot' ? 'compact' : 'full'} />
 
       {/* Rating Block */}
       {config?.enableRating && (
@@ -395,6 +393,8 @@ function ReportContent() {
 
       {/* CTA Block — analyze another site */}
       <CTABlock />
+
+      <ReportFooter />
 
       {/* Detailed Report Loading Overlay */}
       {generatingDetailed && (

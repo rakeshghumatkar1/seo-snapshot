@@ -1,43 +1,58 @@
+import BrandLogo from '@/components/brand/BrandLogo'
+import {
+  BRAND_NAME,
+  REPORT_TAGLINE,
+  displayDomain,
+  formatReportDate,
+  reportDocumentTitle,
+} from '@/lib/report/presentation'
+
 interface ReportHeaderProps {
-  websiteUrl: string;
-  reportType: 'snapshot' | 'detailed';
+  websiteUrl: string
+  reportType: 'snapshot' | 'detailed'
+  generatedAt?: Date
 }
 
-export default function ReportHeader({ websiteUrl, reportType }: ReportHeaderProps) {
+export default function ReportHeader({
+  websiteUrl,
+  reportType,
+  generatedAt,
+}: ReportHeaderProps) {
+  const title = reportDocumentTitle(reportType)
+  const domain = displayDomain(websiteUrl)
+  const dateLabel = formatReportDate(generatedAt || new Date())
+
   return (
-    <div className="glass-elevated p-8 mb-8 relative">
-      <div className="accent-line-top" />
-
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          <div className="badge badge-emerald badge-dot mb-4">SEO VISIBILITY REPORT</div>
-          <h1
-            className="break-all"
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '26px',
-              fontWeight: 700,
-              color: 'var(--t-100)',
-              letterSpacing: '-0.02em',
-              lineHeight: 1.2,
-            }}
-          >
-            {websiteUrl}
-          </h1>
-          <p
-            className="mt-1"
-            style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--t-300)' }}
-          >
-            Generated just now · {reportType === 'detailed' ? 'Detailed' : 'Snapshot'} Report
-          </p>
+    <header className="report-doc-header" aria-labelledby="report-doc-title">
+      <div className="report-doc-header-brand">
+        <BrandLogo size="header" className="report-doc-logo" />
+        <div className="report-doc-brand-text">
+          <p className="report-doc-brand-name">{BRAND_NAME}</p>
+          <p className="report-doc-tagline">{REPORT_TAGLINE}</p>
         </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <div className={`badge ${reportType === 'detailed' ? 'badge-emerald' : 'badge-glass'}`}>
-            {reportType === 'detailed' ? 'DETAILED' : 'SNAPSHOT'}
-          </div>
-        </div>
+        <span className={`report-doc-type-badge report-doc-type-${reportType}`}>
+          {reportType === 'detailed' ? 'Detailed' : 'Snapshot'}
+        </span>
       </div>
-    </div>
-  );
+
+      <h1 id="report-doc-title" className="report-doc-title">
+        {title}
+      </h1>
+
+      <dl className="report-doc-meta">
+        <div>
+          <dt>Prepared for</dt>
+          <dd className="report-doc-domain">{domain}</dd>
+        </div>
+        <div>
+          <dt>Generated</dt>
+          <dd>{dateLabel}</dd>
+        </div>
+        <div>
+          <dt>Analysed website</dt>
+          <dd className="report-doc-url">{websiteUrl}</dd>
+        </div>
+      </dl>
+    </header>
+  )
 }

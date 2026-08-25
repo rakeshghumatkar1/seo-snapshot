@@ -9,7 +9,8 @@ export async function GET() {
     const data = await getPublicHomepageShowcase()
     return NextResponse.json(data, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        // Admin publish/unpublish must reflect quickly on the homepage.
+        'Cache-Control': 'no-store, max-age=0',
       },
     })
   } catch (err) {

@@ -33,7 +33,7 @@ async function launchBrowser(): Promise<Browser> {
 
   if (onVercel) {
     // Required for serverless Chromium on AWS/Vercel.
-    chromium.setGraphicsMode = false
+    ;(chromium as unknown as { graphicsMode: boolean }).graphicsMode = false
 
     const remotePack =
       process.env.CHROMIUM_REMOTE_EXEC_PATH ||

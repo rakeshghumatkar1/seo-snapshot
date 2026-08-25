@@ -92,6 +92,7 @@ export default function AnonymizedSampleDrawer({
   const readyRef = useRef(false)
   const formRef = useRef(form)
   const sectionsRef = useRef(sectionDraft)
+  const sectionDirtyRef = useRef(false)
   const metaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const busyRef = useRef(false)
@@ -100,6 +101,18 @@ export default function AnonymizedSampleDrawer({
 
   formRef.current = form
   sectionsRef.current = sectionDraft
+
+  const markSectionsClean = useCallback(() => {
+    sectionDirtyRef.current = false
+    if (sectionTimer.current) {
+      clearTimeout(sectionTimer.current)
+      sectionTimer.current = null
+    }
+  }, [])
+
+  const markSectionsDirty = useCallback(() => {
+    sectionDirtyRef.current = true
+  }, [])
 
   const host = useMemo(
     () =>
@@ -124,41 +137,48 @@ export default function AnonymizedSampleDrawer({
   const hasDraft = Object.keys(sectionDraft).length > 0
   const busy = generating || publishing
 
-  const applyServerPayload = useCallback((data: any) => {
-    if (data.privacyCheck) setPrivacyCheck(data.privacyCheck)
-    if (data.audit?.issues) setAuditIssues(data.audit.issues)
-    if (Array.isArray(data.residual) && data.residual.length) {
-      setAuditIssues(
-        data.residual.map((r: any) => ({
-          section: r.section || '',
-          reason: `${r.type || 'identifier'}: ${r.match || 'found'}`,
-          text: '',
-        }))
-      )
-    }
-    if (data.preview) {
-      setPreview(data.preview)
-      if (data.preview.sections) setSectionDraft(data.preview.sections)
-    }
-    if (data.showcase) {
-      const sc = data.showcase
-      if (sc.slug) {
-        setForm((prev) => ({
-          ...prev,
-          slug: String(sc.slug || prev.slug),
-          genericLabel: String(sc.public_display_name || prev.genericLabel),
-          businessCategory: String(sc.business_category || prev.businessCategory),
-          publicLocation: String(sc.public_location || prev.publicLocation),
-          featured: Boolean(sc.featured),
-          displayOrder: Number(sc.display_order || prev.displayOrder),
-        }))
+  const applyServerPayload = useCallback(
+    (data: any) => {
+      if (data.privacyCheck) setPrivacyCheck(data.privacyCheck)
+      if (data.audit?.issues) setAuditIssues(data.audit.issues)
+      if (Array.isArray(data.residual) && data.residual.length) {
+        setAuditIssues(
+          data.residual.map((r: any) => ({
+            section: r.section || '',
+            reason: `${r.type || 'identifier'}: ${r.match || 'found'}`,
+            text: '',
+          }))
+        )
       }
-      const status = sc.anonymization_status
-      if (status === 'ready' || status === 'published') setPrivacyCheck('Passed')
-      else if (status === 'needs_review') setPrivacyCheck('Needs Review')
-      else if (status === 'failed') setPrivacyCheck('Failed')
-    }
-  }, [])
+      if (data.preview) {
+        setPreview(data.preview)
+        if (data.preview.sections) {
+          // Server hydration must not be treated as a user edit
+          markSectionsClean()
+          setSectionDraft(data.preview.sections)
+        }
+      }
+      if (data.showcase) {
+        const sc = data.showcase
+        if (sc.slug) {
+          setForm((prev) => ({
+            ...prev,
+            slug: String(sc.slug || prev.slug),
+            genericLabel: String(sc.public_display_name || prev.genericLabel),
+            businessCategory: String(sc.business_category || prev.businessCategory),
+            publicLocation: String(sc.public_location || prev.publicLocation),
+            featured: Boolean(sc.featured),
+            displayOrder: Number(sc.display_order || prev.displayOrder),
+          }))
+        }
+        const status = sc.anonymization_status
+        if (status === 'ready' || status === 'published') setPrivacyCheck('Passed')
+        else if (status === 'needs_review') setPrivacyCheck('Needs Review')
+        else if (status === 'failed') setPrivacyCheck('Failed')
+      }
+    },
+    [markSectionsClean]
+  )
 
   async function apiPost(action: string, extra: Record<string, unknown> = {}) {
     const current = formRef.current
@@ -225,6 +245,7 @@ export default function AnonymizedSampleDrawer({
       formRef.current = hydrated
       const sections =
         (pv?.sections && typeof pv.sections === 'object' ? pv.sections : null) || {}
+      markSectionsClean()
       setSectionDraft(sections)
       setPrivacyCheck(
         sc?.anonymization_status === 'ready' || sc?.anonymization_status === 'published'
@@ -318,12 +339,14 @@ export default function AnonymizedSampleDrawer({
   }, [applyServerPayload, report.id, router])
 
   const saveSectionsNow = useCallback(async () => {
+    if (!sectionDirtyRef.current) return true
     const sections = sectionsRef.current
     if (!Object.keys(sections).length) return true
     setSectionSaveState('saving')
     try {
       const data = await apiPost('save_sections', { sections })
       if (!data) return false
+      markSectionsClean()
       applyServerPayload(data)
       if (data.privacyCheck === 'Needs Review') {
         setError('Privacy check found identifying information in section edits. Fix before publishing.')
@@ -335,7 +358,7 @@ export default function AnonymizedSampleDrawer({
       setError(err?.message || 'Could not save changes.')
       return false
     }
-  }, [applyServerPayload, report.id, router])
+  }, [applyServerPayload, markSectionsClean, report.id, router])
 
   // Debounced metadata autosave
   useEffect(() => {
@@ -350,12 +373,14 @@ export default function AnonymizedSampleDrawer({
     }
   }, [form, generating, publishing, saveMetaNow])
 
-  // Debounced section autosave
+  // Debounced section autosave — ONLY after genuine user edits (dirty)
   useEffect(() => {
     if (!readyRef.current || busyRef.current || generating || publishing) return
+    if (!sectionDirtyRef.current) return
     if (!Object.keys(sectionDraft).length) return
     if (sectionTimer.current) clearTimeout(sectionTimer.current)
     sectionTimer.current = setTimeout(() => {
+      if (!sectionDirtyRef.current) return
       void saveSectionsNow()
     }, SECTION_DEBOUNCE_MS)
     return () => {
@@ -401,6 +426,7 @@ export default function AnonymizedSampleDrawer({
       }
       const data = await apiPost('generate')
       if (!data) return
+      markSectionsClean()
       applyServerPayload(data)
       setSuccessNote(
         data.privacyCheck === 'Passed'
@@ -414,7 +440,10 @@ export default function AnonymizedSampleDrawer({
         err?.message ||
           'Could not generate anonymised sample. Your source report was not changed.'
       )
-      if (err?.data) applyServerPayload(err.data)
+      if (err?.data) {
+        markSectionsClean()
+        applyServerPayload(err.data)
+      }
     } finally {
       setGenerating(false)
       setPreparingMeta(false)
@@ -424,17 +453,22 @@ export default function AnonymizedSampleDrawer({
 
   async function publishToHomepage() {
     if (metaTimer.current) clearTimeout(metaTimer.current)
-    if (sectionTimer.current) clearTimeout(sectionTimer.current)
+    if (sectionTimer.current) {
+      clearTimeout(sectionTimer.current)
+      sectionTimer.current = null
+    }
 
     setPublishing(true)
     busyRef.current = true
     setError(null)
     setSuccessNote(null)
     try {
+      // Flush genuine dirty section edits with publish payload; do not autosave afterward
       const data = await apiPost('publish', {
         sections: Object.keys(sectionsRef.current).length ? sectionsRef.current : undefined,
       })
       if (!data) return
+      markSectionsClean()
       applyServerPayload(data)
       setMetaSaveState('saved')
       setSectionSaveState('saved')
@@ -447,10 +481,12 @@ export default function AnonymizedSampleDrawer({
         err?.message || 'Cannot publish yet. Privacy check found identifying information.'
       )
       if (err?.data) {
+        markSectionsClean()
         applyServerPayload(err.data)
         if (err.data.privacyCheck) setPrivacyCheck(err.data.privacyCheck)
       }
     } finally {
+      markSectionsClean()
       setPublishing(false)
       busyRef.current = false
     }
@@ -871,9 +907,10 @@ export default function AnonymizedSampleDrawer({
                         <textarea
                           value={sectionDraft[key] || ''}
                           disabled={busy}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            markSectionsDirty()
                             setSectionDraft((prev) => ({ ...prev, [key]: e.target.value }))
-                          }
+                          }}
                           rows={4}
                           style={{
                             ...controlStyle,

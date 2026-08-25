@@ -26,6 +26,8 @@ import { normalizeDomain } from '@/lib/url/normalizeDomain'
 import { extractSourceSections } from '@/lib/anonymize/structure'
 import { missingMetadataMessages } from '@/lib/anonymize/sampleMetadataHelpers'
 import { suggestAnonymizedSampleMetadata } from '@/lib/anonymize/suggestSampleMetadata'
+import { normalizeAnonymizedBusinessReferences } from '@/lib/anonymize/normalizeBusinessReferences'
+import { shouldNoOpPublishedSectionSave } from '@/lib/anonymize/sectionDraftCompare'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -382,6 +384,32 @@ export async function POST(req: NextRequest) {
 
       const scan = runDeterministicPrivacyScan(validation.sections, report.website_url)
       const residual = scanSectionsForIdentifiers(scan.cleanedSections, report.website_url)
+      const label = String(existing.public_display_name || '').trim()
+      const sectionsForStore = label
+        ? normalizeAnonymizedBusinessReferences(scan.cleanedSections, label)
+        : scan.cleanedSections
+
+      // Published + identical content → no-op (do not clear use_as_sample via saveAnonymizedDraft)
+      if (
+        shouldNoOpPublishedSectionSave({
+          anonymizationStatus: existing.anonymization_status,
+          useAsSample: existing.use_as_sample,
+          storedSections: existing.anonymized_sections_json,
+          incomingSections: sectionsForStore,
+          residualCount: residual.length,
+        })
+      ) {
+        return NextResponse.json({
+          success: true,
+          status: 'published',
+          privacyCheck: 'Passed',
+          residual: [],
+          noop: true,
+          showcase: existing,
+          preview: publicSafePreview(existing, report),
+        })
+      }
+
       const status = residual.length ? 'needs_review' : 'ready'
       const saved = await saveAnonymizedDraft({
         reportId,

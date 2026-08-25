@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSectionLabel } from '@/lib/report/sectionLabels'
+import { sectionOrderKeys } from '@/lib/report/presentation'
 import { detectReportVersion } from '@/types/report'
 
 type ReportRow = {
@@ -99,10 +100,18 @@ export default function AnonymizedSampleDrawer({
     [report.website_url]
   )
 
-  const sectionKeys = useMemo(() => Object.keys(sectionDraft), [sectionDraft])
-  const hasDraft = sectionKeys.length > 0
   const reportType = report.report_type === 'detailed' ? 'detailed' : 'snapshot'
   const version = detectReportVersion(report.sections_json || sectionDraft)
+  const sectionKeys = useMemo(() => {
+    const keys = Object.keys(sectionDraft)
+    const ordered = sectionOrderKeys(reportType, version)
+    if (!ordered.length) return keys
+    const set = new Set(keys)
+    const out = ordered.filter((k) => set.has(k))
+    for (const k of keys) if (!out.includes(k)) out.push(k)
+    return out
+  }, [sectionDraft, reportType, version])
+  const hasDraft = Object.keys(sectionDraft).length > 0
   const busy = generating || publishing
 
   const applyServerPayload = useCallback((data: any) => {

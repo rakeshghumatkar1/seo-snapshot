@@ -8,6 +8,7 @@ export function middleware(req: NextRequest) {
     pathname.startsWith('/admin/dashboard') ||
     pathname.startsWith('/api/admin/stats') ||
     pathname.startsWith('/api/admin/data') ||
+    pathname.startsWith('/api/admin/leads') ||
     pathname.startsWith('/api/admin/export')
   ) {
     const session = req.cookies.get('admin_session')
@@ -31,6 +32,7 @@ export const config = {
     '/admin/dashboard/:path*',
     '/api/admin/stats',
     '/api/admin/data',
+    '/api/admin/leads',
     '/api/admin/export',
   ],
 }

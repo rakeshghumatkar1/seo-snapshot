@@ -1,5 +1,5 @@
 import fs from 'fs'
-import chromium from '@sparticuz/chromium'
+import chromium from '@sparticuz/chromium-min'
 import puppeteer, { type Browser } from 'puppeteer-core'
 
 function localChromePath(): string | null {
@@ -22,8 +22,8 @@ function localChromePath(): string | null {
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   ]
 
-  for (const path of candidates) {
-    if (fs.existsSync(path)) return path
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate
   }
   return null
 }
@@ -32,10 +32,17 @@ async function launchBrowser(): Promise<Browser> {
   const onVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
 
   if (onVercel) {
+    // Required for serverless Chromium on AWS/Vercel.
+    chromium.setGraphicsMode = false
+
+    const remotePack =
+      process.env.CHROMIUM_REMOTE_EXEC_PATH ||
+      'https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar'
+
     return puppeteer.launch({
-      args: chromium.args,
+      args: [...chromium.args, '--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
       defaultViewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
-      executablePath: await chromium.executablePath(),
+      executablePath: await chromium.executablePath(remotePack),
       headless: true,
     })
   }
@@ -83,6 +90,9 @@ export async function renderHtmlToPdf(html: string): Promise<Buffer> {
     })
     await page.close()
     return Buffer.from(pdf)
+  } catch (err: any) {
+    console.error('[PDF] HTML render failed:', err?.message || err)
+    throw err
   } finally {
     if (browser) {
       await browser.close().catch(() => {})

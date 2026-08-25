@@ -9,6 +9,7 @@ import {
 } from '@/lib/ai/prompts/anonymizePublicSample'
 import { runDeterministicPrivacyScan } from './privacyScan'
 import { parseJsonObject, validateAnonymizedStructure } from './structure'
+import { normalizeAnonymizedBusinessReferences } from './normalizeBusinessReferences'
 import type { PrivacyAuditResult, PrivacyIssue } from './types'
 
 async function callAnonymizeOnce(input: {
@@ -225,7 +226,7 @@ export async function generateAnonymizedSampleContent(input: {
     return {
       ok: true,
       status: 'ready',
-      sections,
+      sections: normalizeAnonymizedBusinessReferences(sections, input.genericLabel),
       audit,
       deterministicPassed: true,
       aiCalls,
@@ -272,6 +273,8 @@ export async function generateAnonymizedSampleContent(input: {
       )
     }
   }
+
+  sections = normalizeAnonymizedBusinessReferences(sections, input.genericLabel)
 
   if (audit.safe && scan.passed) {
     console.log('[AnonymizedSample] Privacy audit passed after repair')

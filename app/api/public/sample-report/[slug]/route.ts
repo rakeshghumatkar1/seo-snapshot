@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dbQuery } from '@/lib/db/client'
 import { ensureHomepageShowcaseSchema } from '@/lib/db/homepageShowcase'
+import { normalizeAnonymizedBusinessReferences } from '@/lib/anonymize/normalizeBusinessReferences'
 import { detectReportVersion } from '@/types/report'
 
 export const dynamic = 'force-dynamic'
@@ -104,6 +105,10 @@ export async function GET(
       if (!Object.keys(cleanSections).length) {
         return NextResponse.json({ error: 'Sample unavailable' }, { status: 404 })
       }
+      cleanSections = normalizeAnonymizedBusinessReferences(
+        cleanSections,
+        String(row.public_display_name || '')
+      )
       version =
         row.anonymized_report_version === 2 || row.anonymized_report_version === 3
           ? row.anonymized_report_version

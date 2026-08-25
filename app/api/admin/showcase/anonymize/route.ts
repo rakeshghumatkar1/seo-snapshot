@@ -514,16 +514,21 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // draft status after manual safe edit without re-audit: allow if deterministic pass
-      if (row.anonymization_status === 'draft') {
-        await saveAnonymizedDraft({
-          reportId,
-          sections: validation.sections,
-          reportVersion: resolved.version,
-          status: 'ready',
-          audit: row.anonymization_audit_json || { note: 'promoted_draft_on_publish' },
-        })
-      }
+      // Persist prose normalisation (and promote draft → ready) before publish
+      await saveAnonymizedDraft({
+        reportId,
+        sections: validation.sections,
+        reportVersion: resolved.version,
+        status: 'ready',
+        audit:
+          row.anonymization_audit_json ||
+          {
+            note:
+              row.anonymization_status === 'draft'
+                ? 'promoted_draft_on_publish'
+                : 'normalized_on_publish',
+          },
+      })
 
       const published = await publishAnonymizedSample(reportId)
       console.log('[AnonymizedSample] Published')

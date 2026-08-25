@@ -47,7 +47,14 @@ REMOVE OR GENERALISE:
 - personally identifying information
 
 REPLACE THE ORGANISATION WITH:
-the supplied generic company label (a descriptive label, not a fake brand name).
+the supplied generic company label ONLY as the public sample identity (header/card).
+
+WRITING STYLE FOR SECTION PROSE:
+- Do NOT repeat the generic company label paragraph after paragraph
+- Prefer natural references inside analytical sections:
+  "the business", "the company", "the website", "the organisation"
+- Avoid phrasing like "The <Generic Label> appears..." in every section
+- The generic label may appear at most rarely in body text if unavoidable; prefer zero repeats
 
 LOCATION:
 Broad city/state/country may be retained where useful (use the Admin-supplied public location).
@@ -79,6 +86,11 @@ export function buildAnonymizeUserPrompt(input: {
 GENERIC COMPANY LABEL: ${input.genericLabel}
 BUSINESS CATEGORY: ${input.businessCategory}
 ALLOWED PUBLIC LOCATION: ${input.publicLocation}
+
+WRITING REMINDER:
+Use "${input.genericLabel}" only as the sample identity.
+Inside section analysis prefer "the business", "the company", "the website", or "the organisation".
+Do not repeat the generic label in every paragraph.
 
 REQUIRED SECTION KEYS (must all appear exactly):
 ${input.sectionKeys.join('\n')}

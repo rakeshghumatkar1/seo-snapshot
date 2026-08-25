@@ -1,5 +1,9 @@
 import { dbQuery } from './client'
 import { SQL_NORMALIZED_DOMAIN } from '@/lib/url/normalizeDomain'
+import {
+  normalizeAnonymizedBusinessReferences,
+  preferAnonymizedHomepageSamples,
+} from '@/lib/anonymize/normalizeBusinessReferences'
 
 let schemaPromise: Promise<void> | null = null
 
@@ -109,7 +113,7 @@ export async function getPublicHomepageShowcase(): Promise<{
 }> {
   await ensureHomepageShowcaseSchema()
 
-  const [stats, samples, recent] = await Promise.all([
+  const [stats, anonymizedSamples, sourceSamples, recent] = await Promise.all([
     getPublicUsageStats(),
     dbQuery(`
       SELECT
@@ -129,14 +133,31 @@ export async function getPublicHomepageShowcase(): Promise<{
       WHERE hs.is_active = TRUE
         AND hs.use_as_sample = TRUE
         AND COALESCE(r.status, 'success') = 'success'
-        AND (
-          COALESCE(hs.sample_content_mode, 'source') = 'source'
-          OR (
-            hs.sample_content_mode = 'anonymized'
-            AND hs.anonymization_status = 'published'
-            AND hs.anonymized_sections_json IS NOT NULL
-          )
-        )
+        AND hs.sample_content_mode = 'anonymized'
+        AND hs.anonymization_status = 'published'
+        AND hs.anonymized_sections_json IS NOT NULL
+      ORDER BY hs.featured DESC, hs.display_order ASC, hs.updated_at DESC
+      LIMIT 12
+    `),
+    dbQuery(`
+      SELECT
+        hs.slug,
+        hs.public_display_name,
+        hs.public_domain,
+        hs.show_domain,
+        hs.business_category,
+        hs.public_location,
+        hs.featured,
+        hs.sample_content_mode,
+        hs.anonymization_status,
+        hs.anonymized_sections_json,
+        r.report_type
+      FROM homepage_showcase hs
+      INNER JOIN reports r ON r.id = hs.report_id
+      WHERE hs.is_active = TRUE
+        AND hs.use_as_sample = TRUE
+        AND COALESCE(r.status, 'success') = 'success'
+        AND COALESCE(hs.sample_content_mode, 'source') = 'source'
       ORDER BY hs.featured DESC, hs.display_order ASC, hs.updated_at DESC
       LIMIT 12
     `),
@@ -153,6 +174,9 @@ export async function getPublicHomepageShowcase(): Promise<{
       LIMIT 24
     `),
   ])
+
+  // Prefer published anonymised samples on the homepage; fall back to source samples only if none exist.
+  const samples = preferAnonymizedHomepageSamples(anonymizedSamples, sourceSamples)
 
   return {
     stats,
@@ -344,6 +368,12 @@ export async function saveAnonymizedDraft(input: {
   audit: unknown
 }) {
   await ensureHomepageShowcaseSchema()
+  const existing = await getShowcaseByReportId(input.reportId)
+  const label = String(existing?.public_display_name || '').trim()
+  const sections = label
+    ? normalizeAnonymizedBusinessReferences(input.sections, label)
+    : input.sections
+
   const rows = await dbQuery(
     `UPDATE homepage_showcase SET
       anonymized_sections_json = $2::jsonb,
@@ -360,7 +390,7 @@ export async function saveAnonymizedDraft(input: {
      RETURNING *`,
     [
       input.reportId,
-      JSON.stringify(input.sections),
+      JSON.stringify(sections),
       input.reportVersion,
       input.status,
       JSON.stringify(input.audit ?? null),

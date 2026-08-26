@@ -38,9 +38,22 @@ const DETAILED_KEYS: Array<[string, DetailedKey]> = [
 export const SNAPSHOT_SECTION_MARKERS_V3 = SNAPSHOT_KEYS.map(([marker]) => marker)
 export const DETAILED_SECTION_MARKERS_V3 = DETAILED_KEYS.map(([marker]) => marker)
 
-export type DetailedMarkerValidation = {
+export type MarkerValidation = {
   valid: boolean
   missing: string[]
+}
+
+export type DetailedMarkerValidation = MarkerValidation
+export type SnapshotMarkerValidation = MarkerValidation
+
+/** Structural check: all required Snapshot V3 markers present in raw text. */
+export function validateSnapshotMarkers(raw: string): SnapshotMarkerValidation {
+  const text = String(raw || '')
+  const missing = SNAPSHOT_SECTION_MARKERS_V3.filter(marker => !text.includes(marker))
+  return {
+    valid: missing.length === 0,
+    missing,
+  }
 }
 
 /** Structural check: all required Detailed V3 markers present in raw text. */
@@ -85,11 +98,17 @@ function hasEnoughContent(
 }
 
 export function parseSnapshotReportV3(raw: string): SnapshotSectionsV3 | null {
-  const sections = extractSections(raw, SNAPSHOT_KEYS) as SnapshotSectionsV3
-  const missing = SNAPSHOT_KEYS.filter(([, key]) => !sections[key]).map(([marker]) => marker)
+  const markerCheck = validateSnapshotMarkers(raw)
+  if (!markerCheck.valid) {
+    console.error('[ParserV3] Snapshot missing markers:', markerCheck.missing.join(', '))
+    return null
+  }
 
-  if (missing.length > 0) {
-    console.error('[ParserV3] Snapshot missing markers:', missing.join(', '))
+  const sections = extractSections(raw, SNAPSHOT_KEYS) as SnapshotSectionsV3
+  const emptyBodies = SNAPSHOT_KEYS.filter(([, key]) => !sections[key]).map(([marker]) => marker)
+
+  if (emptyBodies.length > 0) {
+    console.error('[ParserV3] Snapshot empty section bodies:', emptyBodies.join(', '))
     return null
   }
 

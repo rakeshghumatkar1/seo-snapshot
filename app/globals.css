@@ -1721,6 +1721,30 @@ body:has(.public-site) .noise-overlay {
   color: rgba(255, 255, 255, 0.84) !important;
 }
 
+/* Compact hero vertical rhythm on short laptop/desktop viewports */
+@media (min-width: 1024px) and (max-height: 900px) {
+  .public-section-hero.public-section-hero-compact {
+    padding-top: 3.5rem; /* 56px — was lg:py-24 / 96px */
+    padding-bottom: 3.5rem;
+  }
+
+  .public-section-hero-compact .public-hero-title {
+    margin-top: 0.875rem;
+  }
+
+  .public-section-hero-compact .public-hero-sub {
+    margin-top: 0.875rem;
+  }
+
+  .public-section-hero-compact .public-hero-form {
+    margin-top: 1.5rem;
+  }
+
+  .public-section-hero-compact > .flex.gap-2.mt-5 {
+    margin-top: 1rem;
+  }
+}
+
 .public-form-label {
   display: block;
   text-align: left;
@@ -2040,12 +2064,13 @@ body:has(.public-site) .noise-overlay {
 @media (min-width: 1280px) {
   .public-hero-decor {
     display: block;
+    opacity: 0.16;
   }
 }
 
 @media (min-width: 1536px) {
   .public-hero-decor {
-    opacity: 0.12;
+    opacity: 0.18;
   }
 }
 

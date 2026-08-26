@@ -84,7 +84,7 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/public/homepage-showcase')
+    fetch('/api/public/homepage-showcase', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;

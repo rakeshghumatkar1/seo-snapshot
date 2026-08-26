@@ -2566,6 +2566,12 @@ body:has(.public-site) .noise-overlay {
 
 @media (min-width: 768px) {
   .public-samples-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .public-samples-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
@@ -2905,7 +2911,7 @@ body:has(.public-site) .noise-overlay {
 }
 
 /* -----------------------------------------------------------
-   ADMIN LIGHT THEME (scoped — public site unaffected)
+   ADMIN LIGHT THEME (scoped ï¿½ public site unaffected)
    ----------------------------------------------------------- */
 .admin-shell {
   --admin-bg: #f4f6f9;
@@ -3228,6 +3234,61 @@ body:has(.public-site) .noise-overlay {
   width: 100%;
   border-collapse: collapse;
   min-width: 980px;
+}
+
+.admin-table.admin-table-reports {
+  min-width: 780px;
+  table-layout: auto;
+}
+
+.admin-table.admin-table-reports .admin-td-website {
+  max-width: none;
+  width: 28%;
+}
+
+.admin-table.admin-table-reports .admin-td-website a {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-td-website-host {
+  color: var(--admin-info);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.admin-td-website-path {
+  color: var(--admin-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.admin-td-date-primary {
+  color: var(--admin-text);
+  font-weight: 600;
+}
+
+.admin-td-date-time {
+  color: var(--admin-text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.admin-table.admin-table-reports th:nth-child(4),
+.admin-table.admin-table-reports th:nth-child(5),
+.admin-table.admin-table-reports th:nth-child(6),
+.admin-table.admin-table-reports th:nth-child(7),
+.admin-table.admin-table-reports td:nth-child(4),
+.admin-table.admin-table-reports td:nth-child(5),
+.admin-table.admin-table-reports td:nth-child(6),
+.admin-table.admin-table-reports td:nth-child(7) {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .admin-table th {

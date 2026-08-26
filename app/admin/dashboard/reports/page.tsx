@@ -67,8 +67,37 @@ function formatDate(value: string) {
   })
 }
 
+function formatDateParts(value: string): { date: string; time: string } {
+  if (!value) return { date: '—', time: '' }
+  const d = new Date(value)
+  return {
+    date: d.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }),
+    time: d.toLocaleTimeString('en-IN', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }),
+  }
+}
+
 function hostFromUrl(url: string) {
   return url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+}
+
+/** Domain + optional path for compact table display (full URL remains the link href). */
+function websiteDisplayParts(url: string): { host: string; path: string | null } {
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`)
+    const host = parsed.hostname.replace(/^www\./i, '')
+    const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname.replace(/\/$/, '') || null : null
+    return { host: host || hostFromUrl(url), path }
+  } catch {
+    return { host: hostFromUrl(url), path: null }
+  }
 }
 
 function sampleBadge(status: string | null | undefined) {
@@ -605,7 +634,7 @@ export default function ReportsLibraryPage() {
           <div className="admin-empty">No reports match these filters.</div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table">
+            <table className="admin-table admin-table-reports">
               <thead>
                 <tr>
                   <th className="admin-th-check">
@@ -620,7 +649,6 @@ export default function ReportsLibraryPage() {
                   <th>Date</th>
                   <th>Website</th>
                   <th>Type</th>
-                  <th>Email</th>
                   <th>PDF</th>
                   <th>Sample</th>
                   <th>Share</th>
@@ -633,6 +661,8 @@ export default function ReportsLibraryPage() {
                   const isSelected = selected.has(row.id)
                   const nonSuccess = row.status && row.status !== 'success'
                   const isShared = row.share_status === 'shared'
+                  const dateParts = formatDateParts(row.created_at)
+                  const site = websiteDisplayParts(row.website_url)
                   return (
                     <tr key={row.id} className={isSelected ? 'is-selected' : undefined}>
                       <td className="admin-td-check">
@@ -640,20 +670,26 @@ export default function ReportsLibraryPage() {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRow(row.id)}
-                          aria-label={`Select ${hostFromUrl(row.website_url)}`}
+                          aria-label={`Select ${site.host}`}
                         />
                       </td>
-                      <td className="admin-td-muted admin-td-nowrap">
-                        {formatDate(row.created_at)}
+                      <td className="admin-td-date admin-td-nowrap">
+                        <div className="admin-td-date-primary">{dateParts.date}</div>
+                        {dateParts.time ? (
+                          <div className="admin-td-date-time">{dateParts.time}</div>
+                        ) : null}
                         {nonSuccess ? (
-                          <span className="admin-badge admin-badge-warn" style={{ marginLeft: 6 }}>
+                          <span className="admin-badge admin-badge-warn" style={{ marginTop: 4 }}>
                             {row.status}
                           </span>
                         ) : null}
                       </td>
                       <td className="admin-td-website">
                         <a href={row.website_url} target="_blank" rel="noreferrer">
-                          {hostFromUrl(row.website_url)}
+                          <span className="admin-td-website-host">{site.host}</span>
+                          {site.path ? (
+                            <span className="admin-td-website-path">{site.path}</span>
+                          ) : null}
                         </a>
                       </td>
                       <td>
@@ -665,7 +701,6 @@ export default function ReportsLibraryPage() {
                           {row.report_type}
                         </span>
                       </td>
-                      <td>{row.email || '—'}</td>
                       <td>
                         <span
                           className={`admin-badge ${

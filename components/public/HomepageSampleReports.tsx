@@ -71,12 +71,14 @@ export default function HomepageSampleReports({
 }: {
   samples: SampleReportCard[]
 }) {
-  const [index, setIndex] = useState(0)
-  const pageSize = 3
-  const maxIndex = Math.max(0, samples.length - pageSize)
+  const [page, setPage] = useState(0)
+  /** Desktop: 3 columns × 2 rows. Page-based nav when more than 6 samples. */
+  const pageSize = 6
+  const totalPages = Math.max(1, Math.ceil(samples.length / pageSize))
+  const safePage = Math.min(page, totalPages - 1)
   const visible = useMemo(
-    () => samples.slice(index, index + pageSize),
-    [samples, index]
+    () => samples.slice(safePage * pageSize, safePage * pageSize + pageSize),
+    [samples, safePage]
   )
 
   if (!samples.length) return null
@@ -101,8 +103,8 @@ export default function HomepageSampleReports({
                 type="button"
                 className="public-samples-nav-btn"
                 aria-label="Previous samples"
-                disabled={index === 0}
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                disabled={safePage === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
               >
                 ←
               </button>
@@ -110,8 +112,8 @@ export default function HomepageSampleReports({
                 type="button"
                 className="public-samples-nav-btn"
                 aria-label="Next samples"
-                disabled={index >= maxIndex}
-                onClick={() => setIndex((i) => Math.min(maxIndex, i + 1))}
+                disabled={safePage >= totalPages - 1}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               >
                 →
               </button>

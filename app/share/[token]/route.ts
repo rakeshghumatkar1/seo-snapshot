@@ -26,10 +26,23 @@ export async function GET(
     if (!TOKEN_RE.test(token)) return notFound()
 
     const share = await getActiveShareByToken(token)
-    if (!share) return notFound()
+    if (!share) {
+      const res = notFound()
+      res.headers.set('X-Share-State', 'inactive-or-missing')
+      return res
+    }
+    if (share.is_active !== true || share.revoked_at) {
+      const res = notFound()
+      res.headers.set('X-Share-State', 'inactive-guard')
+      return res
+    }
 
     const pdf = await getStoredReportPdf(share.report_id)
-    if (!pdf) return notFound()
+    if (!pdf) {
+      const res = notFound()
+      res.headers.set('X-Share-State', 'pdf-missing')
+      return res
+    }
 
     // Best-effort access tracking — do not fail the PDF response
     void touchShareAccess(share.id).catch(() => {})
@@ -43,6 +56,7 @@ export async function GET(
         'Content-Disposition': `inline; filename="${safeName}"`,
         'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
         'X-Robots-Tag': 'noindex, nofollow, noarchive',
+        'X-Share-State': 'active',
       },
     })
   } catch (err) {

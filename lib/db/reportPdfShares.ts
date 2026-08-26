@@ -78,12 +78,15 @@ export async function getActiveShareByToken(
     `SELECT *
      FROM report_pdf_shares
      WHERE share_token = $1
-       AND is_active = TRUE
-       AND revoked_at IS NULL
      LIMIT 1`,
     [token]
   )
-  return (rows[0] as PdfShareRow) || null
+  const row = (rows[0] as PdfShareRow) || null
+  if (!row) return null
+  // Explicit JS checks — avoid boolean/NULL quirks on filtered SQL alone
+  if (row.is_active !== true) return null
+  if (row.revoked_at) return null
+  return row
 }
 
 /**

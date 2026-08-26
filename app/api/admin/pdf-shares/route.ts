@@ -1,15 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import {
   countActiveShares,
   createOrGetPdfShare,
   getActiveShareForReport,
+  listActiveShareTokens,
+  listActiveShareTokensForReports,
   revokeAllActiveShares,
   revokeShareForReport,
   revokeSharesForReports,
 } from '@/lib/db/reportPdfShares'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+function bustShareCaches(tokens: string[]) {
+  for (const token of tokens) {
+    if (!token) continue
+    try {
+      revalidatePath(`/share/${token}`)
+    } catch {
+      // best-effort; route itself is force-dynamic + no-store
+    }
+  }
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MAX_BATCH = 100
@@ -96,7 +111,9 @@ export async function POST(req: NextRequest) {
     if (!UUID_RE.test(reportId)) {
       return NextResponse.json({ error: 'Invalid report id' }, { status: 400 })
     }
+    const tokens = await listActiveShareTokensForReports([reportId])
     const revoked = await revokeShareForReport(reportId)
+    bustShareCaches(tokens)
     return NextResponse.json({
       success: true,
       revoked,
@@ -114,7 +131,9 @@ export async function POST(req: NextRequest) {
     if (!reportIds.length) {
       return NextResponse.json({ error: 'No valid report ids supplied' }, { status: 400 })
     }
+    const tokens = await listActiveShareTokensForReports(reportIds)
     const revoked = await revokeSharesForReports(reportIds)
+    bustShareCaches(tokens)
     return NextResponse.json({
       success: true,
       revoked,
@@ -123,7 +142,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'revoke_all') {
+    const tokens = await listActiveShareTokens()
     const revoked = await revokeAllActiveShares()
+    bustShareCaches(tokens)
     return NextResponse.json({
       success: true,
       revoked,

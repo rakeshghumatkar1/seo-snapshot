@@ -78,12 +78,14 @@ export async function getActiveShareByToken(
     `SELECT *
      FROM report_pdf_shares
      WHERE share_token = $1
+       AND is_active = TRUE
+       AND revoked_at IS NULL
      LIMIT 1`,
     [token]
   )
   const row = (rows[0] as PdfShareRow) || null
   if (!row) return null
-  // Explicit JS checks — avoid boolean/NULL quirks on filtered SQL alone
+  // Explicit JS checks — defense in depth against driver boolean quirks
   if (row.is_active !== true) return null
   if (row.revoked_at) return null
   return row
@@ -128,6 +130,33 @@ export async function createOrGetPdfShare(
     if (again) return { share: again, created: false }
     throw err
   }
+}
+
+export async function listActiveShareTokensForReports(
+  reportIds: string[]
+): Promise<string[]> {
+  await ensureReportPdfSharesSchema()
+  if (!reportIds.length) return []
+  const rows = await dbQuery(
+    `SELECT share_token
+     FROM report_pdf_shares
+     WHERE report_id = ANY($1::uuid[])
+       AND is_active = TRUE
+       AND revoked_at IS NULL`,
+    [reportIds]
+  )
+  return rows.map((r) => String(r.share_token))
+}
+
+export async function listActiveShareTokens(): Promise<string[]> {
+  await ensureReportPdfSharesSchema()
+  const rows = await dbQuery(
+    `SELECT share_token
+     FROM report_pdf_shares
+     WHERE is_active = TRUE
+       AND revoked_at IS NULL`
+  )
+  return rows.map((r) => String(r.share_token))
 }
 
 export async function revokeShareForReport(reportId: string): Promise<number> {

@@ -16,23 +16,23 @@ import HomepageSeoCaseStudies from '@/components/public/HomepageSeoCaseStudies';
 
 
 const SNAPSHOT_FEATURES = [
-  'Visible business positioning',
   'Website and service clarity',
+  'Visible trust signals',
   'Content usefulness',
-  'Trust and visibility opportunities',
-  'Up to three priority areas',
-  'Report visible without registration',
+  'Search readiness',
+  'Key opportunities',
+  'Main priorities',
 ];
 
 const DETAILED_FEATURES = [
-  'Everything included in Snapshot',
-  'Deeper positioning and content review',
-  'Customer-search and topic directions',
-  'Competitive-readiness observations',
-  'Trust and authority signals',
-  'Prioritised improvement roadmap',
-  'Five or six sequenced priorities',
-  'Downloadable report where currently supported',
+  'Executive business assessment',
+  'Search as a growth channel',
+  'Customer intent and discovery',
+  'Positioning and offer clarity',
+  'Google and AI search readiness',
+  'Trust and enquiry readiness',
+  'Priority investment plan',
+  'Action roadmap',
 ];
 
 function FeatureList({ items }: { items: string[] }) {
@@ -139,23 +139,24 @@ export default function Home() {
         </div>
 
         <p className="public-eyebrow public-eyebrow-hero fade-up delay-0">
-          A THINK BIG DIGITAL SEO TOOL · FREE SNAPSHOT
+          FREE SEARCH &amp; BUSINESS GROWTH REVIEW
         </p>
 
         <h1 className="public-heading-hero fade-up delay-1 public-hero-title">
-          Your Website&apos;s SEO,{' '}
-          <span className="public-accent-gradient">Explained for Business</span>
+          See What Your Website{' '}
+          <span className="public-accent-gradient">Should Improve First</span>
         </h1>
 
         <p className="fade-up delay-2 public-body-lg public-hero-sub">
-          Get a free, business-friendly review of selected publicly visible pages on your website.
-          No technical score, no jargon—just clear observations and priorities.
+          Get a business-focused review of selected publicly visible pages on your website. See what
+          may be helping or limiting search visibility, trust, AI discovery and enquiry readiness —
+          with clear priorities on what to improve first.
         </p>
 
         <form
           onSubmit={handleSubmit}
           className="fade-up delay-3 w-full public-hero-form"
-          aria-label="Generate a free SEO Snapshot"
+          aria-label="Review my website"
           noValidate
         >
           <label htmlFor="homepage-url" className="public-form-label">
@@ -180,7 +181,7 @@ export default function Home() {
               }
             />
             <button type="submit" className="btn btn-primary btn-lg w-full sm:w-auto whitespace-nowrap">
-              Generate Free Snapshot
+              Review My Website
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path
                   d="M3 8h10M9 4l4 4-4 4"
@@ -200,10 +201,13 @@ export default function Home() {
               {urlError}
             </p>
           ) : null}
+          <p className="public-form-helper">
+            No signup required for the free review. We only analyse selected publicly visible pages.
+          </p>
         </form>
 
         <div className="fade-up delay-4 flex gap-2 mt-5 justify-center flex-wrap">
-          {['Free Snapshot', 'No signup required', 'Business-first guidance'].map((t) => (
+          {['Free Review', 'No signup required', 'Clear business priorities'].map((t) => (
             <span key={t} className="public-trust-pill">
               {t}
             </span>
@@ -235,15 +239,15 @@ export default function Home() {
           <div className="text-center mb-10 lg:mb-12">
             <p className="public-eyebrow public-eyebrow-on-light mb-3">WHY IT MATTERS</p>
             <h2 className="public-heading-section public-section-title">
-              Understand What Matters Before Investing in SEO
+              Know What Matters Before You Invest More in SEO
             </h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5 lg:gap-6">
             {[
               {
-                title: 'Clarity Before Complexity',
-                body: 'See whether visitors can quickly understand what you offer, who it is for and why it matters.',
+                title: 'Clarity Before Technical Detail',
+                body: 'See whether visitors can quickly understand what you do, who it is for and why your offer matters.',
                 icon: (
                   <path
                     strokeLinecap="round"
@@ -254,8 +258,8 @@ export default function Home() {
                 ),
               },
               {
-                title: 'Business Impact, Not Error Lists',
-                body: 'Understand how visible content, trust and website clarity may influence discoverability and customer confidence.',
+                title: 'Business Priorities, Not Error Lists',
+                body: "Understand how visibility, content, trust and conversion issues may affect the website's ability to support business growth.",
                 icon: (
                   <path
                     strokeLinecap="round"
@@ -267,7 +271,7 @@ export default function Home() {
               },
               {
                 title: 'Priorities You Can Act On',
-                body: 'Receive a focused explanation of the opportunities worth addressing first—without a technical data dump.',
+                body: 'Focus on the improvements most worth addressing first, with clear priorities rather than a long list of technical tasks.',
                 icon: (
                   <path
                     strokeLinecap="round"
@@ -304,17 +308,17 @@ export default function Home() {
             {
               num: '1',
               title: 'Enter Your Website',
-              body: 'Paste your website URL. The Snapshot does not require registration or a credit card.',
+              body: 'Enter your website URL. We review selected publicly visible pages without requiring access to your website or analytics.',
             },
             {
               num: '2',
-              title: 'AI Reviews Visible Pages',
-              body: 'The tool reviews selected publicly visible pages for messaging, content usefulness, visible structure and trust signals. It does not perform a complete technical crawl.',
+              title: 'We Analyse Selected Pages',
+              body: 'The review looks at visible content, service clarity, structure, trust signals, search readiness and other business-facing signals.',
             },
             {
               num: '3',
-              title: 'Receive Clear Direction',
-              body: 'Get a business-friendly Snapshot explaining visible strengths, opportunities and the priorities worth considering first.',
+              title: 'See What to Improve First',
+              body: 'See what appears strong, what may be limiting visibility or enquiries, and which areas deserve attention first.',
             },
           ].map((step) => (
             <div key={step.num} className="public-card public-card-balanced public-step-card">
@@ -333,30 +337,30 @@ export default function Home() {
       {/* Two-step report journey */}
       <section className="public-section-compare public-section-compact">
         <div className="max-w-4xl mx-auto px-6 text-center mb-10 lg:mb-12">
-          <p className="public-eyebrow mb-3">YOUR FREE REPORT PATH</p>
+          <p className="public-eyebrow mb-3">FROM QUICK REVIEW TO DEEPER INSIGHT</p>
           <h2 className="public-heading-section public-compare-heading">
-            Start With a Free Snapshot. Go Deeper When Ready.
+            Start With a Free Review. Go Deeper When You Need More Detail.
           </h2>
           <p className="public-body-lg public-compare-intro">
-            Review the Snapshot first, then request the free Detailed Report if you want deeper
-            guidance.
+            Review your website first. If you want deeper analysis, continue to the detailed Search
+            &amp; Business Growth Report.
           </p>
         </div>
 
         <div className="max-w-4xl mx-auto px-6 grid md:grid-cols-2 gap-5 lg:gap-6 public-journey-grid">
-          {/* Step 1 — Snapshot */}
+          {/* Step 1 — Free review */}
           <article className="public-journey-card public-journey-card-primary">
             <div className="public-journey-card-body">
               <span className="public-journey-badge public-journey-badge-step1">STEP 1 · FREE</span>
-              <h3 className="public-journey-title">Snapshot Report</h3>
+              <h3 className="public-journey-title">Free Website Review</h3>
               <p className="public-journey-lead">
-                Your starting point before deciding whether you want the Detailed Report.
+                A quick business-focused review of selected visible pages.
               </p>
               <FeatureList items={SNAPSHOT_FEATURES} />
             </div>
             <div className="public-journey-card-footer">
               <Link href="/tool" className="btn btn-primary btn-lg public-journey-btn">
-                Generate Free Snapshot
+                Review My Website
               </Link>
             </div>
           </article>
@@ -367,22 +371,22 @@ export default function Home() {
               <span className="public-journey-badge public-journey-badge-step2">STEP 2 · FREE</span>
               <h3 className="public-journey-title">Detailed Report</h3>
               <p className="public-journey-lead">
-                Available after you review your Snapshot. The Detailed Report is also free. Email
-                required.
+                A deeper Search &amp; Business Growth Report with more context, priorities and
+                recommended next steps.
               </p>
               <FeatureList items={DETAILED_FEATURES} />
             </div>
             <div className="public-journey-card-footer">
               <Link href="/tool" className="btn btn-secondary btn-lg public-journey-btn">
-                Start With the Free Snapshot
+                Get the Detailed Report
               </Link>
             </div>
           </article>
         </div>
 
         <p className="public-compare-reminder">
-          Both reports are free. The Snapshot requires no signup; the Detailed Report requires your
-          email.
+          Start with the free review. Continue to the detailed report only if you want deeper
+          analysis.
         </p>
       </section>
 

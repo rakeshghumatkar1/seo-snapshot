@@ -44,7 +44,7 @@ export default function Header() {
             <div className="public-header-brand flex items-center shrink-0">
               <BrandLogo size="header" />
               <Link href="/" className="public-product-lockup">
-                <span className="block public-product-name">SEO Snapshot</span>
+                <span className="block public-product-name">Search &amp; Growth Report</span>
                 <span className="block public-product-descriptor">A Think Big Digital Tool</span>
               </Link>
             </div>
@@ -87,7 +87,7 @@ export default function Header() {
             {/* Desktop CTA */}
             <div className="hidden xl:flex items-center shrink-0">
               <Link href="/tool" className="btn btn-primary public-header-cta">
-                Generate Free Snapshot
+                Review My Website
               </Link>
             </div>
 
@@ -160,7 +160,7 @@ export default function Header() {
                 onClick={() => setMobileOpen(false)}
                 className="btn btn-primary btn-lg w-full justify-center"
               >
-                Generate Free Snapshot
+                Review My Website
               </Link>
             </div>
           </nav>

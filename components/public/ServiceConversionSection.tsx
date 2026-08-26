@@ -18,14 +18,14 @@ export default function ServiceConversionSection() {
           </svg>
         </div>
         <p className="public-eyebrow public-eyebrow-on-light mb-4">
-          NEED HELP IMPLEMENTING THE FINDINGS?
+          READY TO TURN THE REPORT INTO ACTION?
         </p>
         <h2 id="service-conversion-heading" className="public-heading-section public-service-heading">
-          Want Help Turning These Insights Into Improvements?
+          Need Help Turning the Findings Into Practical Improvements?
         </h2>
         <p className="public-body-lg public-service-body">
-          Think Big Digital can help you review the priorities, strengthen your website and turn
-          the findings into a practical SEO and content improvement plan.
+          Think Big Digital can help you prioritise, plan and implement the website, content and SEO
+          improvements identified in your report.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
@@ -35,7 +35,7 @@ export default function ServiceConversionSection() {
             rel="noopener noreferrer"
             className="btn btn-primary btn-lg public-service-btn"
           >
-            Discuss Your SEO Requirements
+            Discuss SEO Support
           </a>
           <a
             href={THINK_BIG_SERVICES}
@@ -43,7 +43,7 @@ export default function ServiceConversionSection() {
             rel="noopener noreferrer"
             className="btn btn-secondary btn-lg public-service-btn"
           >
-            Explore Think Big Services
+            Explore Think Big Digital
           </a>
         </div>
 

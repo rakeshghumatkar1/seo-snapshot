@@ -10,11 +10,11 @@ export default function HomepageSeoCaseStudies() {
     <section className="public-section-case-studies public-section-compact" aria-label="SEO case studies">
       <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-10 lg:mb-12">
-          <p className="public-eyebrow public-eyebrow-on-light mb-3">PROVEN SEO WORK</p>
-          <h2 className="public-heading-section public-section-title">SEO Results in Practice</h2>
+          <p className="public-eyebrow public-eyebrow-on-light mb-3">PROJECTS WE HAVE DONE</p>
+          <h2 className="public-heading-section public-section-title">SEO Work in Practice</h2>
           <p className="public-body-lg public-case-studies-intro">
-            See how Think Big Digital has helped businesses improve search visibility, organic growth
-            and lead generation.
+            See how Think Big Digital has approached search visibility, website improvement and
+            organic growth across real client projects.
           </p>
         </div>
 

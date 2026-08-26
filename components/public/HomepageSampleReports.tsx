@@ -91,10 +91,11 @@ export default function HomepageSampleReports({
         <div className="text-center mb-10 lg:mb-12">
           <p className="public-eyebrow public-eyebrow-on-light mb-3">SEE A REAL REPORT</p>
           <h2 className="public-heading-section public-section-title">
-            Explore Sample Reports Before Generating Your Own.
+            See What the Detailed Report Actually Looks Like
           </h2>
           <p className="public-body-lg public-samples-intro">
-            See the type of business-focused guidance the report provides.
+            Review sample reports across different businesses and see how website findings are turned
+            into priorities and practical next steps.
           </p>
         </div>
 
@@ -153,7 +154,7 @@ export default function HomepageSampleReports({
                     href={`/sample-report/${encodeURIComponent(sample.slug)}`}
                     className="public-sample-link"
                   >
-                    View Report →
+                    View Sample Report →
                   </Link>
                 </div>
               </article>

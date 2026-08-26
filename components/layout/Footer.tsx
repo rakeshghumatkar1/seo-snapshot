@@ -21,9 +21,9 @@ export default function Footer() {
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <BrandLogo size="footer" href={THINK_BIG_HOME} />
-            <p className="public-footer-product-name mt-4">SEO Snapshot</p>
+            <p className="public-footer-product-name mt-4">Search &amp; Growth Report</p>
             <p className="public-footer-tagline mt-2">
-              A business-friendly SEO visibility tool from ThinkBig Digital Solutions Pvt Ltd.
+              A Think Big Digital tool for business-focused website, search and growth analysis.
             </p>
           </div>
 

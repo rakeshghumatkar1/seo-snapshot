@@ -49,10 +49,10 @@ export default function HomepageUsageStats({
   stats: UsageStats
 }) {
   const cards = [
-    { label: 'Websites Analysed', value: stats.websitesAnalysed, kind: 'sites' as const },
-    { label: 'Reports Generated', value: stats.reportsGenerated, kind: 'reports' as const },
+    { label: 'Websites Reviewed', value: stats.websitesAnalysed, kind: 'sites' as const },
+    { label: 'Reports Created', value: stats.reportsGenerated, kind: 'reports' as const },
     {
-      label: 'Detailed Reports Created',
+      label: 'Detailed Reports Generated',
       value: stats.detailedReportsCreated,
       kind: 'detailed' as const,
     },

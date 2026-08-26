@@ -1,6 +1,7 @@
 export type ReportTypeFilter = 'all' | 'snapshot' | 'detailed'
 export type PdfFilter = 'all' | 'stored' | 'missing'
 export type SampleFilter = 'all' | 'published' | 'draft' | 'none'
+export type ShareFilter = 'all' | 'shared' | 'private'
 export type DateFilter = 'all' | 'today' | '7d' | '30d'
 export type SortPreset =
   | 'newest'
@@ -24,6 +25,11 @@ export function parsePdfFilter(value: string | null | undefined): PdfFilter {
 
 export function parseSampleFilter(value: string | null | undefined): SampleFilter {
   if (value === 'published' || value === 'draft' || value === 'none') return value
+  return 'all'
+}
+
+export function parseShareFilter(value: string | null | undefined): ShareFilter {
+  if (value === 'shared' || value === 'private') return value
   return 'all'
 }
 

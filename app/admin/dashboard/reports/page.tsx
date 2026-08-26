@@ -10,12 +10,14 @@ import {
   iterableSectionEntries,
 } from '@/lib/report/sectionLabels'
 import AnonymizedSampleDrawer from '@/components/admin/AnonymizedSampleDrawer'
+import ShareLinkModal from '@/components/admin/ShareLinkModal'
 import type {
   DateFilter,
   PdfFilter,
   ReportTypeFilter,
   SampleFilter,
   SampleStatus,
+  ShareFilter,
   SortPreset,
 } from '@/lib/admin/reportFilters'
 import {
@@ -24,6 +26,7 @@ import {
   parsePdfFilter,
   parseReportTypeFilter,
   parseSampleFilter,
+  parseShareFilter,
   parseSortPreset,
 } from '@/lib/admin/reportFilters'
 
@@ -39,6 +42,8 @@ interface ReportRow {
   pdf_generated_at: string | null
   has_pdf: boolean
   sample_status?: SampleStatus | string | null
+  share_status?: 'shared' | 'private' | string | null
+  share_created_at?: string | null
 }
 
 interface Summary {
@@ -46,9 +51,10 @@ interface Summary {
   snapshot: number
   detailed: number
   pdfCount: number
+  activeShareCount?: number
 }
 
-const EMPTY_SUMMARY: Summary = { total: 0, snapshot: 0, detailed: 0, pdfCount: 0 }
+const EMPTY_SUMMARY: Summary = { total: 0, snapshot: 0, detailed: 0, pdfCount: 0, activeShareCount: 0 }
 
 function formatDate(value: string) {
   if (!value) return '—'
@@ -88,6 +94,7 @@ export default function ReportsLibraryPage() {
   const [type, setType] = useState<ReportTypeFilter>(() => parseReportTypeFilter(searchParams.get('type')))
   const [pdf, setPdf] = useState<PdfFilter>(() => parsePdfFilter(searchParams.get('pdf')))
   const [sample, setSample] = useState<SampleFilter>(() => parseSampleFilter(searchParams.get('sample')))
+  const [share, setShare] = useState<ShareFilter>(() => parseShareFilter(searchParams.get('share')))
   const [date, setDate] = useState<DateFilter>(() => parseDateFilter(searchParams.get('date')))
   const [sort, setSort] = useState<SortPreset>(() => parseSortPreset(searchParams.get('sort')))
   const [loading, setLoading] = useState(true)
@@ -97,9 +104,13 @@ export default function ReportsLibraryPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [viewing, setViewing] = useState<ReportRow | null>(null)
   const [anonymizeReport, setAnonymizeReport] = useState<ReportRow | null>(null)
+  const [shareReport, setShareReport] = useState<ReportRow | null>(null)
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [confirmBulkRevokeShares, setConfirmBulkRevokeShares] = useState(false)
+  const [confirmRevokeAllShares, setConfirmRevokeAllShares] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [openPdfId, setOpenPdfId] = useState<string | null>(null)
+  const [activeShareCount, setActiveShareCount] = useState(0)
   const headerCheckboxRef = useRef<HTMLInputElement>(null)
 
   const filtersActive =
@@ -107,6 +118,7 @@ export default function ReportsLibraryPage() {
     type !== 'all' ||
     pdf !== 'all' ||
     sample !== 'all' ||
+    share !== 'all' ||
     date !== 'all' ||
     sort !== 'newest' ||
     limit !== 20
@@ -119,6 +131,7 @@ export default function ReportsLibraryPage() {
       type: ReportTypeFilter
       pdf: PdfFilter
       sample: SampleFilter
+      share: ShareFilter
       date: DateFilter
       sort: SortPreset
     }) => {
@@ -127,6 +140,7 @@ export default function ReportsLibraryPage() {
       if (next.type !== 'all') params.set('type', next.type)
       if (next.pdf !== 'all') params.set('pdf', next.pdf)
       if (next.sample !== 'all') params.set('sample', next.sample)
+      if (next.share !== 'all') params.set('share', next.share)
       if (next.date !== 'all') params.set('date', next.date)
       if (next.sort !== 'newest') params.set('sort', next.sort)
       if (next.limit !== 20) params.set('limit', String(next.limit))
@@ -148,6 +162,7 @@ export default function ReportsLibraryPage() {
         type,
         pdf,
         sample,
+        share,
         date,
         sort,
       })
@@ -167,15 +182,16 @@ export default function ReportsLibraryPage() {
 
       setRows(data.rows || [])
       setSummary(data.summary || EMPTY_SUMMARY)
+      setActiveShareCount(Number(data.summary?.activeShareCount || 0))
       setTotalRows(Number(data.total || 0))
       setTotalPages(nextTotalPages)
-      syncUrl({ page, limit, q: query, type, pdf, sample, date, sort })
+      syncUrl({ page, limit, q: query, type, pdf, sample, share, date, sort })
     } catch (err: any) {
       setError(err?.message || 'Failed to load reports')
     } finally {
       setLoading(false)
     }
-  }, [date, limit, page, pdf, query, router, sample, sort, syncUrl, type])
+  }, [date, limit, page, pdf, query, router, sample, share, sort, syncUrl, type])
 
   useEffect(() => {
     const timer = setTimeout(loadReports, 250)
@@ -186,7 +202,7 @@ export default function ReportsLibraryPage() {
     setSelected(new Set())
     setOpenMenuId(null)
     setOpenPdfId(null)
-  }, [page, type, pdf, sample, date, sort, limit, query])
+  }, [page, type, pdf, sample, share, date, sort, limit, query])
 
   useEffect(() => {
     if (!successNote) return
@@ -232,6 +248,7 @@ export default function ReportsLibraryPage() {
     setType('all')
     setPdf('all')
     setSample('all')
+    setShare('all')
     setDate('all')
     setSort('newest')
     setLimit(20)
@@ -277,6 +294,67 @@ export default function ReportsLibraryPage() {
       return
     }
     await deleteIds([report.id])
+  }
+
+  const selectedSharedCount = useMemo(
+    () => rows.filter((r) => selected.has(r.id) && r.share_status === 'shared').length,
+    [rows, selected]
+  )
+
+  async function revokeSelectedShares() {
+    if (!selected.size || actionLoading) return
+    setActionLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/pdf-shares', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'revoke_selected',
+          reportIds: Array.from(selected),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to revoke share links')
+      const revoked = Number(data.revoked || 0)
+      setSuccessNote(
+        revoked
+          ? `${revoked} public PDF link${revoked === 1 ? '' : 's'} revoked.`
+          : 'No active share links among the selection.'
+      )
+      setConfirmBulkRevokeShares(false)
+      setSelected(new Set())
+      setActiveShareCount(Number(data.activeShareCount || 0))
+      await loadReports()
+    } catch (err: any) {
+      setError(err?.message || 'Failed to revoke share links')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function revokeAllShares() {
+    if (!activeShareCount || actionLoading) return
+    setActionLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/pdf-shares', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke_all' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to revoke all share links')
+      const revoked = Number(data.revoked || 0)
+      setSuccessNote(`${revoked} public PDF link${revoked === 1 ? '' : 's'} revoked.`)
+      setConfirmRevokeAllShares(false)
+      setActiveShareCount(0)
+      await loadReports()
+    } catch (err: any) {
+      setError(err?.message || 'Failed to revoke all share links')
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   return (
@@ -397,6 +475,21 @@ export default function ReportsLibraryPage() {
             </select>
           </label>
           <label className="admin-field">
+            <span>Share</span>
+            <select
+              className="admin-input"
+              value={share}
+              onChange={(e) => {
+                setShare(parseShareFilter(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="all">All</option>
+              <option value="shared">Shared</option>
+              <option value="private">Private</option>
+            </select>
+          </label>
+          <label className="admin-field">
             <span>Date</span>
             <select
               className="admin-input"
@@ -450,6 +543,17 @@ export default function ReportsLibraryPage() {
               Clear Filters
             </button>
           ) : null}
+          {activeShareCount > 0 ? (
+            <button
+              type="button"
+              className="admin-btn admin-btn-ghost"
+              disabled={actionLoading}
+              onClick={() => setConfirmRevokeAllShares(true)}
+              title="Revoke every active public PDF link"
+            >
+              Revoke All Active Links ({activeShareCount})
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -460,6 +564,14 @@ export default function ReportsLibraryPage() {
         <div className="admin-bulk-bar">
           <span className="admin-bulk-count">{selected.size} selected</span>
           <div className="admin-bulk-actions">
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              disabled={actionLoading || selectedSharedCount === 0}
+              onClick={() => setConfirmBulkRevokeShares(true)}
+            >
+              Revoke Share Links
+            </button>
             <button
               type="button"
               className="admin-btn admin-btn-danger"
@@ -510,6 +622,7 @@ export default function ReportsLibraryPage() {
                   <th>Email</th>
                   <th>PDF</th>
                   <th>Sample</th>
+                  <th>Share</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -518,6 +631,7 @@ export default function ReportsLibraryPage() {
                   const sampleInfo = sampleBadge(row.sample_status)
                   const isSelected = selected.has(row.id)
                   const nonSuccess = row.status && row.status !== 'success'
+                  const isShared = row.share_status === 'shared'
                   return (
                     <tr key={row.id} className={isSelected ? 'is-selected' : undefined}>
                       <td className="admin-td-check">
@@ -562,6 +676,15 @@ export default function ReportsLibraryPage() {
                       </td>
                       <td>
                         <span className={sampleInfo.className}>{sampleInfo.label}</span>
+                      </td>
+                      <td>
+                        <span
+                          className={`admin-badge ${
+                            isShared ? 'admin-badge-info' : 'admin-badge-muted'
+                          }`}
+                        >
+                          {isShared ? 'Shared' : 'Private'}
+                        </span>
                       </td>
                       <td>
                         <div className="admin-row-actions">
@@ -612,6 +735,18 @@ export default function ReportsLibraryPage() {
                               </div>
                             ) : null}
                           </div>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn-secondary admin-btn-sm"
+                            title="Public PDF share link"
+                            onClick={() => {
+                              setShareReport(row)
+                              setOpenPdfId(null)
+                              setOpenMenuId(null)
+                            }}
+                          >
+                            Share
+                          </button>
                           <div className="admin-menu">
                             <button
                               type="button"
@@ -759,6 +894,110 @@ export default function ReportsLibraryPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {confirmBulkRevokeShares ? (
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => !actionLoading && setConfirmBulkRevokeShares(false)}
+        >
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div className="admin-modal-title">Revoke share links for selection?</div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                disabled={actionLoading}
+                onClick={() => setConfirmBulkRevokeShares(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              <p>
+                Revoke public PDF links for the selected reports ({selectedSharedCount} currently
+                shared among {selected.size} selected).
+              </p>
+              <p>Anyone using those links will immediately lose access. Reports and PDFs are not deleted.</p>
+            </div>
+            <div className="admin-modal-footer">
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary"
+                disabled={actionLoading}
+                onClick={() => setConfirmBulkRevokeShares(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                disabled={actionLoading}
+                onClick={revokeSelectedShares}
+              >
+                {actionLoading ? 'Revoking…' : 'Revoke Share Links'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmRevokeAllShares ? (
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => !actionLoading && setConfirmRevokeAllShares(false)}
+        >
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div className="admin-modal-title">
+                Revoke all {activeShareCount} active public PDF links?
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                disabled={actionLoading}
+                onClick={() => setConfirmRevokeAllShares(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              <p>Anyone using any of these links will immediately lose access.</p>
+              <p>Reports and stored PDFs will NOT be deleted.</p>
+            </div>
+            <div className="admin-modal-footer">
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary"
+                disabled={actionLoading}
+                onClick={() => setConfirmRevokeAllShares(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                disabled={actionLoading}
+                onClick={revokeAllShares}
+              >
+                {actionLoading ? 'Revoking…' : `Revoke All ${activeShareCount} Links`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {shareReport ? (
+        <ShareLinkModal
+          reportId={shareReport.id}
+          hostLabel={hostFromUrl(shareReport.website_url)}
+          hasPdf={Boolean(shareReport.has_pdf)}
+          initiallyShared={shareReport.share_status === 'shared'}
+          onClose={() => setShareReport(null)}
+          onChanged={() => {
+            void loadReports()
+          }}
+        />
       ) : null}
 
       {anonymizeReport ? (

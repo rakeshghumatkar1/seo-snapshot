@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import { ensureReportArchiveSchema } from '@/lib/db/reportArchive'
 import { ensureHomepageShowcaseSchema } from '@/lib/db/homepageShowcase'
+import {
+  countActiveShares,
+  ensureReportPdfSharesSchema,
+} from '@/lib/db/reportPdfShares'
 import { dbQuery } from '@/lib/db/client'
 import {
   dateFilterCutoffUtc,
@@ -10,6 +14,7 @@ import {
   parsePdfFilter,
   parseReportTypeFilter,
   parseSampleFilter,
+  parseShareFilter,
   parseSortPreset,
   sampleStatusSqlCase,
   sortPresetToSql,
@@ -23,7 +28,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await Promise.all([ensureReportArchiveSchema(), ensureHomepageShowcaseSchema()])
+    await Promise.all([
+      ensureReportArchiveSchema(),
+      ensureHomepageShowcaseSchema(),
+      ensureReportPdfSharesSchema(),
+    ])
 
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
@@ -33,6 +42,7 @@ export async function GET(req: NextRequest) {
     const type = parseReportTypeFilter(searchParams.get('type'))
     const pdf = parsePdfFilter(searchParams.get('pdf'))
     const sample = parseSampleFilter(searchParams.get('sample'))
+    const share = parseShareFilter(searchParams.get('share'))
     const date = parseDateFilter(searchParams.get('date'))
     const sortPreset = parseSortPreset(searchParams.get('sort'))
     const { column: sortColumn, direction: sortDirection } = sortPresetToSql(sortPreset)
@@ -79,6 +89,12 @@ export async function GET(req: NextRequest) {
       )`)
     }
 
+    if (share === 'shared') {
+      clauses.push(`rps.id IS NOT NULL`)
+    } else if (share === 'private') {
+      clauses.push(`rps.id IS NULL`)
+    }
+
     const cutoff = dateFilterCutoffUtc(date)
     if (cutoff) {
       params.push(cutoff.toISOString())
@@ -103,9 +119,13 @@ export async function GET(req: NextRequest) {
     const fromJoin = `
       FROM reports r
       LEFT JOIN homepage_showcase hs ON hs.report_id = r.id
+      LEFT JOIN report_pdf_shares rps
+        ON rps.report_id = r.id
+       AND rps.is_active = TRUE
+       AND rps.revoked_at IS NULL
     `
 
-    const [rows, countRows, summaryRows] = await Promise.all([
+    const [rows, countRows, summaryRows, activeShareCount] = await Promise.all([
       dbQuery(
         `SELECT
           r.id,
@@ -121,7 +141,9 @@ export async function GET(req: NextRequest) {
           hs.sample_content_mode,
           hs.anonymization_status,
           hs.use_as_sample,
-          (${sampleStatusExpr}) AS sample_status
+          (${sampleStatusExpr}) AS sample_status,
+          CASE WHEN rps.id IS NOT NULL THEN 'shared' ELSE 'private' END AS share_status,
+          rps.created_at AS share_created_at
          ${fromJoin}
          ${where}
          ORDER BY ${sortColumn} ${sortDirection} NULLS LAST, r.created_at DESC
@@ -137,6 +159,7 @@ export async function GET(req: NextRequest) {
           COUNT(*) FILTER (WHERE pdf_base64 IS NOT NULL) AS pdf_count
         FROM reports
       `),
+      countActiveShares(),
     ])
 
     const total = Number(countRows[0]?.total || 0)
@@ -152,8 +175,9 @@ export async function GET(req: NextRequest) {
         snapshot: Number(summaryRows[0]?.snapshot || 0),
         detailed: Number(summaryRows[0]?.detailed || 0),
         pdfCount: Number(summaryRows[0]?.pdf_count || 0),
+        activeShareCount,
       },
-      filters: { type, pdf, sample, date, sort: sortPreset, q: query, limit },
+      filters: { type, pdf, sample, share, date, sort: sortPreset, q: query, limit },
     })
   } catch (err) {
     console.error('[Admin/reports GET]', err)

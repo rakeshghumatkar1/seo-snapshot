@@ -160,6 +160,30 @@ export async function ensureReportPDF(reportId: string) {
   return { bytes: pdf.bytes, filename: pdf.filename }
 }
 
+/**
+ * Return already-stored PDF bytes only — never regenerate.
+ * Used by public share links.
+ */
+export async function getStoredReportPdf(reportId: string) {
+  await ensureReportArchiveSchema()
+
+  const rows = await dbQuery(
+    `SELECT website_url, report_type, pdf_base64, pdf_filename
+     FROM reports
+     WHERE id = $1
+       AND pdf_base64 IS NOT NULL
+     LIMIT 1`,
+    [reportId]
+  )
+
+  if (!rows.length || !rows[0].pdf_base64) return null
+  const report = rows[0]
+  return {
+    bytes: Buffer.from(report.pdf_base64, 'base64'),
+    filename: report.pdf_filename || reportPDFFilename(report.website_url, report.report_type),
+  }
+}
+
 export async function getArchivedReportPdf(reportId: string) {
   return ensureReportPDF(reportId)
 }

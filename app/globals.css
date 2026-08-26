@@ -4163,6 +4163,12 @@ body:has(.public-site) .noise-overlay {
   z-index: 20;
 }
 
+/* Escape table overflow clipping so row actions stay clickable */
+.admin-more-menu-fixed {
+  position: fixed;
+  z-index: 280;
+}
+
 .admin-more-item {
   display: block;
   width: 100%;

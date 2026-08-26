@@ -95,7 +95,22 @@ function LeadsPageInner() {
   const [editing, setEditing] = useState<Lead | null>(null)
   const [form, setForm] = useState<EditForm | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    if (!menuOpenId) return
+    const close = () => {
+      setMenuOpenId(null)
+      setMenuPos(null)
+    }
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [menuOpenId])
 
   const syncUrl = useCallback(
     (next: {
@@ -480,20 +495,36 @@ function LeadsPageInner() {
                             <button
                               type="button"
                               className="admin-btn admin-btn-ghost admin-btn-compact"
-                              onClick={() =>
-                                setMenuOpenId((id) => (id === row.id ? null : row.id))
-                              }
+                              onClick={(e) => {
+                                if (menuOpenId === row.id) {
+                                  setMenuOpenId(null)
+                                  setMenuPos(null)
+                                  return
+                                }
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setMenuPos({
+                                  top: rect.bottom + 4,
+                                  right: Math.max(8, window.innerWidth - rect.right),
+                                })
+                                setMenuOpenId(row.id)
+                              }}
                             >
                               More ▾
                             </button>
-                            {menuOpenId === row.id ? (
-                              <div className="admin-more-menu">
+                            {menuOpenId === row.id && menuPos ? (
+                              <div
+                                className="admin-more-menu admin-more-menu-fixed"
+                                style={{ top: menuPos.top, right: menuPos.right }}
+                              >
                                 <a
                                   href={row.website_url}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="admin-more-item"
-                                  onClick={() => setMenuOpenId(null)}
+                                  onClick={() => {
+                                    setMenuOpenId(null)
+                                    setMenuPos(null)
+                                  }}
                                 >
                                   Open Website
                                 </a>
@@ -502,6 +533,7 @@ function LeadsPageInner() {
                                   className="admin-more-item admin-more-item-danger"
                                   onClick={() => {
                                     setMenuOpenId(null)
+                                    setMenuPos(null)
                                     setConfirmDeleteIds([row.id])
                                   }}
                                 >

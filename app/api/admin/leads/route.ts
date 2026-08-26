@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import { dbQuery } from '@/lib/db/client'
-
-const SORT_COLUMNS: Record<string, string> = {
-  created_at: 'created_at',
-  name: 'name',
-  company: 'company',
-  email: 'email',
-  website_url: 'website_url',
-  requested_report_type: 'requested_report_type',
-}
+import {
+  leadDateCutoffUtc,
+  leadSortToSql,
+  parseLeadDateFilter,
+  parseLeadLimit,
+  parseLeadSortPreset,
+  parseLeadTypeFilter,
+} from '@/lib/admin/leadFilters'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -20,45 +19,54 @@ function validIds(value: unknown): string[] {
     .slice(0, 100)
 }
 
-async function requireAdmin() {
-  return isAdminAuthenticated()
-}
-
 export async function GET(req: NextRequest) {
-  if (!(await requireAdmin())) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, Number(searchParams.get('page')) || 1)
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20))
+    const limit = parseLeadLimit(searchParams.get('limit'))
     const offset = (page - 1) * limit
     const query = (searchParams.get('q') || '').trim()
-    const requestedSort = searchParams.get('sort') || 'created_at'
-    const sortColumn = SORT_COLUMNS[requestedSort] || 'created_at'
-    const sortDirection = searchParams.get('dir') === 'asc' ? 'ASC' : 'DESC'
+    const type = parseLeadTypeFilter(searchParams.get('type'))
+    const date = parseLeadDateFilter(searchParams.get('date'))
+    const sortPreset = parseLeadSortPreset(searchParams.get('sort'))
+    const { column: sortColumn, direction: sortDirection } = leadSortToSql(sortPreset)
 
+    const clauses: string[] = []
     const params: any[] = []
-    let where = ''
+
+    if (type !== 'all') {
+      params.push(type)
+      clauses.push(`LOWER(COALESCE(requested_report_type, '')) = $${params.length}`)
+    }
+
+    const cutoff = leadDateCutoffUtc(date)
+    if (cutoff) {
+      params.push(cutoff.toISOString())
+      clauses.push(`created_at >= $${params.length}::timestamptz`)
+    }
 
     if (query) {
       params.push(`%${query}%`)
       const p = `$${params.length}`
-      where = `WHERE (
+      clauses.push(`(
         COALESCE(email, '') ILIKE ${p} OR
         COALESCE(name, '') ILIKE ${p} OR
         COALESCE(company, '') ILIKE ${p} OR
         COALESCE(website_url, '') ILIKE ${p} OR
         COALESCE(requested_report_type, '') ILIKE ${p}
-      )`
+      )`)
     }
 
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
     const rowParams = [...params, limit, offset]
     const limitParam = `$${params.length + 1}`
     const offsetParam = `$${params.length + 2}`
 
-    const [rows, countRows] = await Promise.all([
+    const [rows, countRows, summaryRows] = await Promise.all([
       dbQuery(
         `SELECT id, email, name, company, website_url, requested_report_type, created_at
          FROM leads
@@ -68,6 +76,17 @@ export async function GET(req: NextRequest) {
         rowParams
       ),
       dbQuery(`SELECT COUNT(*) AS total FROM leads ${where}`, params),
+      dbQuery(
+        `SELECT
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (
+             WHERE LOWER(COALESCE(requested_report_type, '')) = 'detailed'
+           )::int AS detailed_count,
+           COUNT(*) FILTER (
+             WHERE created_at >= NOW() - INTERVAL '7 days'
+           )::int AS recent_count
+         FROM leads`
+      ),
     ])
 
     const total = Number(countRows[0]?.total || 0)
@@ -78,6 +97,12 @@ export async function GET(req: NextRequest) {
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+      summary: {
+        total: Number(summaryRows[0]?.total || 0),
+        detailedCount: Number(summaryRows[0]?.detailed_count || 0),
+        recentCount: Number(summaryRows[0]?.recent_count || 0),
+      },
+      filters: { type, date, sort: sortPreset, q: query, limit },
     })
   } catch (err) {
     console.error('[Admin/leads GET]', err)
@@ -86,7 +111,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await requireAdmin())) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -101,10 +126,14 @@ export async function PATCH(req: NextRequest) {
     const updates = body.updates || {}
     const email = typeof updates.email === 'string' ? updates.email.trim().toLowerCase() : ''
     const websiteUrl = typeof updates.websiteUrl === 'string' ? updates.websiteUrl.trim() : ''
-    const requestedReportType = typeof updates.requestedReportType === 'string' ? updates.requestedReportType.trim() : ''
+    const requestedReportType =
+      typeof updates.requestedReportType === 'string' ? updates.requestedReportType.trim() : ''
 
     if (!id || !email || !websiteUrl || !requestedReportType) {
-      return NextResponse.json({ error: 'Lead id, email, website and report type are required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Lead id, email, website and report type are required' },
+        { status: 400 }
+      )
     }
 
     const rows = await dbQuery(
@@ -119,7 +148,9 @@ export async function PATCH(req: NextRequest) {
       [
         email,
         typeof updates.name === 'string' && updates.name.trim() ? updates.name.trim() : null,
-        typeof updates.company === 'string' && updates.company.trim() ? updates.company.trim() : null,
+        typeof updates.company === 'string' && updates.company.trim()
+          ? updates.company.trim()
+          : null,
         websiteUrl,
         requestedReportType,
         id,
@@ -138,7 +169,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!(await requireAdmin())) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -160,6 +191,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true, deleted: rows.length })
   } catch (err) {
     console.error('[Admin/leads DELETE]', err)
-    return NextResponse.json({ error: 'Failed to delete lead' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete leads' }, { status: 500 })
   }
 }

@@ -367,7 +367,7 @@ export default function ReportsLibraryPage() {
             Manage archived reports, open content or PDFs, and publish anonymised homepage samples.
           </p>
         </div>
-        <Link href="/admin/dashboard" className="admin-btn admin-btn-secondary">
+        <Link href="/admin/dashboard" className="admin-btn admin-btn-secondary admin-btn-desktop-only">
           ← Dashboard
         </Link>
       </div>

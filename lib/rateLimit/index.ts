@@ -9,6 +9,10 @@ interface RateLimitEntry {
 const WINDOW_MS = 24 * 60 * 60 * 1000  // 24 hours
 const MAX_REQUESTS = 20
 
+/** Public constants for Admin Rate Limits UI (must match enforcement). */
+export const RATE_LIMIT_WINDOW_MS = WINDOW_MS
+export const RATE_LIMIT_MAX_REQUESTS = MAX_REQUESTS
+
 // In-memory store — fast, resets on redeploy
 const memoryStore = new Map<string, RateLimitEntry>()
 

@@ -1,10 +1,21 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-
-type SortDirection = 'asc' | 'desc'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import AdminConfirmModal from '@/components/admin/AdminConfirmModal'
+import AdminEmptyState from '@/components/admin/AdminEmptyState'
+import type {
+  LeadDateFilter,
+  LeadSortPreset,
+  LeadTypeFilter,
+} from '@/lib/admin/leadFilters'
+import {
+  parseLeadDateFilter,
+  parseLeadLimit,
+  parseLeadSortPreset,
+  parseLeadTypeFilter,
+} from '@/lib/admin/leadFilters'
 
 interface Lead {
   id: string
@@ -24,6 +35,12 @@ interface EditForm {
   requestedReportType: string
 }
 
+interface Summary {
+  total: number
+  detailedCount: number
+  recentCount: number
+}
+
 function formatDate(value: string) {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('en-IN', {
@@ -35,67 +52,139 @@ function formatDate(value: string) {
   })
 }
 
-export default function LeadManagerPage() {
+function hostFromUrl(url: string) {
+  return String(url || '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/$/, '')
+}
+
+function requestBadge(type: string) {
+  const value = String(type || '').toLowerCase()
+  if (value === 'detailed') return { label: 'Detailed', className: 'admin-badge admin-badge-info' }
+  if (value === 'snapshot') return { label: 'Snapshot', className: 'admin-badge admin-badge-muted' }
+  if (value === 'pdf') return { label: 'PDF', className: 'admin-badge admin-badge-success' }
+  return { label: type || '—', className: 'admin-badge admin-badge-muted' }
+}
+
+function LeadsPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [rows, setRows] = useState<Lead[]>([])
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1))
+  const [limit, setLimit] = useState(() => parseLeadLimit(searchParams.get('limit')))
   const [totalPages, setTotalPages] = useState(1)
   const [totalRows, setTotalRows] = useState(0)
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState('created_at')
-  const [direction, setDirection] = useState<SortDirection>('desc')
+  const [query, setQuery] = useState(() => searchParams.get('q') || '')
+  const [type, setType] = useState<LeadTypeFilter>(() =>
+    parseLeadTypeFilter(searchParams.get('type'))
+  )
+  const [date, setDate] = useState<LeadDateFilter>(() =>
+    parseLeadDateFilter(searchParams.get('date'))
+  )
+  const [sort, setSort] = useState<LeadSortPreset>(() =>
+    parseLeadSortPreset(searchParams.get('sort'))
+  )
+  const [summary, setSummary] = useState<Summary>({ total: 0, detailedCount: 0, recentCount: 0 })
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successNote, setSuccessNote] = useState<string | null>(null)
   const [editing, setEditing] = useState<Lead | null>(null)
   const [form, setForm] = useState<EditForm | null>(null)
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [confirmDeleteIds, setConfirmDeleteIds] = useState<string[] | null>(null)
+
+  const syncUrl = useCallback(
+    (next: {
+      page: number
+      limit: number
+      q: string
+      type: LeadTypeFilter
+      date: LeadDateFilter
+      sort: LeadSortPreset
+    }) => {
+      const params = new URLSearchParams()
+      if (next.page > 1) params.set('page', String(next.page))
+      if (next.limit !== 20) params.set('limit', String(next.limit))
+      if (next.q.trim()) params.set('q', next.q.trim())
+      if (next.type !== 'all') params.set('type', next.type)
+      if (next.date !== 'all') params.set('date', next.date)
+      if (next.sort !== 'newest') params.set('sort', next.sort)
+      const qs = params.toString()
+      router.replace(qs ? `/admin/dashboard/leads?${qs}` : '/admin/dashboard/leads')
+    },
+    [router]
+  )
 
   const loadLeads = useCallback(async () => {
     setLoading(true)
     setError(null)
-
     try {
       const params = new URLSearchParams({
         page: String(page),
-        limit: '20',
+        limit: String(limit),
         q: query,
+        type,
+        date,
         sort,
-        dir: direction,
       })
-
       const res = await fetch(`/api/admin/leads?${params.toString()}`, { cache: 'no-store' })
       if (res.status === 401) {
         router.push('/admin')
         return
       }
-
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to load leads')
-
       setRows(data.rows || [])
       setTotalRows(Number(data.total || 0))
       setTotalPages(Math.max(1, Number(data.totalPages || 1)))
+      if (data.summary) setSummary(data.summary)
       setSelected(new Set())
+      setMenuOpenId(null)
     } catch (err: any) {
       setError(err?.message || 'Failed to load leads')
     } finally {
       setLoading(false)
     }
-  }, [direction, page, query, router, sort])
+  }, [date, limit, page, query, router, sort, type])
 
   useEffect(() => {
-    const timer = setTimeout(loadLeads, 250)
+    syncUrl({ page, limit, q: query, type, date, sort })
+  }, [date, limit, page, query, sort, syncUrl, type])
+
+  useEffect(() => {
+    const timer = setTimeout(loadLeads, 200)
     return () => clearTimeout(timer)
   }, [loadLeads])
 
+  useEffect(() => {
+    if (!successNote) return
+    const t = setTimeout(() => setSuccessNote(null), 3200)
+    return () => clearTimeout(t)
+  }, [successNote])
+
   const allVisibleSelected = useMemo(
-    () => rows.length > 0 && rows.every(row => selected.has(row.id)),
+    () => rows.length > 0 && rows.every((row) => selected.has(row.id)),
     [rows, selected]
   )
 
+  const filtersActive =
+    query.trim() !== '' || type !== 'all' || date !== 'all' || sort !== 'newest' || limit !== 20
+
+  function clearFilters() {
+    setQuery('')
+    setType('all')
+    setDate('all')
+    setSort('newest')
+    setLimit(20)
+    setPage(1)
+  }
+
   function toggleRow(id: string) {
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -104,22 +193,18 @@ export default function LeadManagerPage() {
   }
 
   function toggleVisible() {
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev)
-      if (allVisibleSelected) rows.forEach(row => next.delete(row.id))
-      else rows.forEach(row => next.add(row.id))
+      if (allVisibleSelected) rows.forEach((row) => next.delete(row.id))
+      else rows.forEach((row) => next.add(row.id))
       return next
     })
   }
 
-  async function deleteLeads(ids: string[]) {
+  async function performDelete(ids: string[]) {
     if (!ids.length) return
-    const label = ids.length === 1 ? 'this lead' : `${ids.length} leads`
-    if (!window.confirm(`Permanently delete ${label}? This cannot be undone.`)) return
-
     setActionLoading(true)
     setError(null)
-
     try {
       const res = await fetch('/api/admin/leads', {
         method: 'DELETE',
@@ -128,12 +213,13 @@ export default function LeadManagerPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to delete leads')
-
-      if (rows.length === ids.length && page > 1) {
-        setPage(p => Math.max(1, p - 1))
-      } else {
-        await loadLeads()
-      }
+      const deleted = Number(data.deleted || ids.length)
+      setSuccessNote(
+        deleted === 1 ? '1 lead deleted.' : `${deleted} leads deleted.`
+      )
+      setConfirmDeleteIds(null)
+      if (rows.length === ids.length && page > 1) setPage((p) => Math.max(1, p - 1))
+      else await loadLeads()
     } catch (err: any) {
       setError(err?.message || 'Failed to delete leads')
     } finally {
@@ -142,13 +228,14 @@ export default function LeadManagerPage() {
   }
 
   function openEdit(lead: Lead) {
+    setMenuOpenId(null)
     setEditing(lead)
     setForm({
       email: lead.email || '',
       name: lead.name || '',
       company: lead.company || '',
       websiteUrl: lead.website_url || '',
-      requestedReportType: lead.requested_report_type || '',
+      requestedReportType: lead.requested_report_type || 'detailed',
     })
   }
 
@@ -158,10 +245,8 @@ export default function LeadManagerPage() {
       setError('Email, website and report type are required.')
       return
     }
-
     setActionLoading(true)
     setError(null)
-
     try {
       const res = await fetch('/api/admin/leads', {
         method: 'PATCH',
@@ -170,9 +255,9 @@ export default function LeadManagerPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to save lead')
-
       setEditing(null)
       setForm(null)
+      setSuccessNote('Lead updated.')
       await loadLeads()
     } catch (err: any) {
       setError(err?.message || 'Failed to save lead')
@@ -181,222 +266,406 @@ export default function LeadManagerPage() {
     }
   }
 
-  const controlStyle: React.CSSProperties = {
-    padding: '9px 11px',
-    borderRadius: '8px',
-    border: '1px solid var(--glass-border)',
-    background: 'var(--glass-1)',
-    color: 'var(--t-100)',
-    fontSize: '12px',
-    outline: 'none',
-  }
-
-  const thStyle: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '10px 12px',
-    borderBottom: '1px solid var(--glass-border)',
-    color: 'var(--t-300)',
-    fontWeight: 700,
-    fontSize: '10px',
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    whiteSpace: 'nowrap',
-  }
-
-  const tdStyle: React.CSSProperties = {
-    padding: '11px 12px',
-    color: 'var(--t-200)',
-    fontSize: '12px',
-    verticalAlign: 'middle',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-  }
-
   return (
-    <main className="admin-page" style={{ paddingTop: 42 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '22px', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', color: '#34d399', marginBottom: '7px' }}>
-            ADMIN · LEADS
+    <main className="admin-page">
+      <AdminPageHeader
+        eyebrow="ADMIN · LEADS"
+        title="Leads"
+        subtitle="Incoming businesses requesting detailed analysis."
+      />
+
+      <div className="admin-summary-grid admin-summary-grid-3">
+        {[
+          { label: 'Total Leads', value: summary.total },
+          { label: 'Detailed Requests', value: summary.detailedCount },
+          { label: 'Recent (7d)', value: summary.recentCount },
+        ].map((card) => (
+          <div key={card.label} className="admin-summary-card admin-summary-card-static">
+            <span className="admin-summary-label">{card.label}</span>
+            <span className="admin-summary-value">{card.value}</span>
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '26px', fontWeight: 800, color: 'var(--t-100)', margin: 0 }}>
-            Leads
-          </h1>
-          <div style={{ color: 'var(--t-400)', fontSize: '13px', marginTop: '7px' }}>
-            {totalRows} total leads · Search, sort, edit or delete records.
-          </div>
-        </div>
-        <Link href="/admin/dashboard" className="btn btn-secondary" style={{ textDecoration: 'none', fontSize: '12px' }}>
-          ← Dashboard
-        </Link>
+        ))}
       </div>
 
-      <div className="glass" style={{ padding: '18px', marginBottom: '18px' }}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="admin-panel admin-filters">
+        <div className="admin-filter-row">
           <input
+            className="admin-input admin-input-search"
             value={query}
-            onChange={e => { setQuery(e.target.value); setPage(1) }}
-            placeholder="Search email, name, company or website..."
-            style={{ ...controlStyle, flex: '1 1 300px', minWidth: '220px' }}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Search email, name, company or website…"
           />
-          <select value={sort} onChange={e => { setSort(e.target.value); setPage(1) }} style={controlStyle}>
-            <option value="created_at">Sort: Date</option>
-            <option value="company">Sort: Company</option>
-            <option value="name">Sort: Name</option>
-            <option value="email">Sort: Email</option>
-            <option value="website_url">Sort: Website</option>
-            <option value="requested_report_type">Sort: Report Type</option>
-          </select>
-          <button
-            onClick={() => setDirection(d => d === 'asc' ? 'desc' : 'asc')}
-            className="btn btn-secondary"
-            style={{ fontSize: '12px', padding: '9px 13px' }}
-          >
-            {direction === 'asc' ? '↑ Ascending' : '↓ Descending'}
-          </button>
+        </div>
+        <div className="admin-filter-row admin-filter-row-wrap">
+          <label className="admin-field">
+            <span>Report Type</span>
+            <select
+              className="admin-input"
+              value={type}
+              onChange={(e) => {
+                setType(parseLeadTypeFilter(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="all">All</option>
+              <option value="detailed">Detailed</option>
+              <option value="snapshot">Snapshot</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Date</span>
+            <select
+              className="admin-input"
+              value={date}
+              onChange={(e) => {
+                setDate(parseLeadDateFilter(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Sort</span>
+            <select
+              className="admin-input"
+              value={sort}
+              onChange={(e) => {
+                setSort(parseLeadSortPreset(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="company_asc">Company A–Z</option>
+              <option value="company_desc">Company Z–A</option>
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>Rows</span>
+            <select
+              className="admin-input"
+              value={String(limit)}
+              onChange={(e) => {
+                setLimit(parseLeadLimit(e.target.value))
+                setPage(1)
+              }}
+            >
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          {filtersActive ? (
+            <button type="button" className="admin-btn admin-btn-secondary" onClick={clearFilters}>
+              Clear Filters
+            </button>
+          ) : null}
         </div>
 
-        {selected.size > 0 && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--glass-border)' }}>
-            <span style={{ fontSize: '12px', color: 'var(--t-300)', marginRight: '4px' }}>{selected.size} selected</span>
+        {selected.size > 0 ? (
+          <div className="admin-bulk-bar">
+            <span>{selected.size} selected</span>
             <button
+              type="button"
+              className="admin-btn admin-btn-danger"
               disabled={actionLoading}
-              onClick={() => deleteLeads(Array.from(selected))}
-              style={{ padding: '7px 12px', borderRadius: '7px', border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+              onClick={() => setConfirmDeleteIds(Array.from(selected))}
             >
               Delete Selected
             </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn-ghost"
+              onClick={() => setSelected(new Set())}
+            >
+              Clear Selection
+            </button>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {error && (
-        <div style={{ padding: '11px 14px', marginBottom: '16px', borderRadius: '8px', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: '12px', fontWeight: 600 }}>
-          {error}
-        </div>
-      )}
+      {error ? <div className="admin-alert admin-alert-danger">{error}</div> : null}
+      {successNote ? <div className="admin-alert admin-alert-success">{successNote}</div> : null}
 
-      <div className="glass" style={{ padding: '18px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ color: 'var(--t-400)', fontSize: '12px' }}>
-            {totalRows} matching records · Page {page} of {totalPages}
-          </div>
-          {actionLoading && <div style={{ color: '#34d399', fontSize: '11px', fontWeight: 700 }}>Saving changes...</div>}
+      <div className="admin-panel">
+        <div className="admin-table-meta">
+          {totalRows} matching records · Page {page} of {totalPages}
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '54px' }}>
-            <div className="loader" style={{ margin: '0 auto' }} />
+          <div className="admin-loading">
+            <div className="loader" />
           </div>
         ) : rows.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '54px', color: 'var(--t-400)', fontSize: '13px' }}>
-            No leads match your search.
-          </div>
+          <AdminEmptyState
+            title={filtersActive ? 'No leads match your filters.' : 'No leads yet.'}
+            body={
+              filtersActive
+                ? 'Try clearing filters or refining your search.'
+                : 'New detailed-report requests will appear here.'
+            }
+          />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
               <thead>
                 <tr>
-                  <th style={{ ...thStyle, width: '42px' }}>
-                    <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} aria-label="Select visible leads" />
+                  <th style={{ width: 42 }}>
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleVisible}
+                      aria-label="Select current page"
+                    />
                   </th>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Email</th>
-                  <th style={thStyle}>Company</th>
-                  <th style={thStyle}>Website</th>
-                  <th style={thStyle}>Report</th>
-                  <th style={thStyle}>Created</th>
-                  <th style={thStyle}>Actions</th>
+                  <th>Date</th>
+                  <th>Contact</th>
+                  <th>Company</th>
+                  <th>Website</th>
+                  <th>Request</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(row => (
-                  <tr key={row.id} style={{ background: selected.has(row.id) ? 'rgba(16,185,129,0.05)' : 'transparent' }}>
-                    <td style={tdStyle}>
-                      <input type="checkbox" checked={selected.has(row.id)} onChange={() => toggleRow(row.id)} aria-label={`Select ${row.email}`} />
-                    </td>
-                    <td style={{ ...tdStyle, fontWeight: 650, color: 'var(--t-100)' }}>{row.name || '—'}</td>
-                    <td style={tdStyle}>{row.email}</td>
-                    <td style={tdStyle}>{row.company || '—'}</td>
-                    <td style={{ ...tdStyle, maxWidth: '230px' }}>
-                      <a href={row.website_url} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>
-                        {row.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                      </a>
-                    </td>
-                    <td style={tdStyle}>{row.requested_report_type}</td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--t-400)' }}>{formatDate(row.created_at)}</td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
-                        <button className="btn btn-secondary" disabled={actionLoading} onClick={() => openEdit(row)} style={{ fontSize: '10px', padding: '5px 9px' }}>
-                          Edit
-                        </button>
-                        <button
-                          disabled={actionLoading}
-                          onClick={() => deleteLeads([row.id])}
-                          style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.28)', background: 'transparent', color: '#f87171', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}
+                {rows.map((row) => {
+                  const badge = requestBadge(row.requested_report_type)
+                  return (
+                    <tr key={row.id} className={selected.has(row.id) ? 'is-selected' : undefined}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(row.id)}
+                          onChange={() => toggleRow(row.id)}
+                          aria-label={`Select ${row.email}`}
+                        />
+                      </td>
+                      <td className="admin-table-muted">{formatDate(row.created_at)}</td>
+                      <td>
+                        <div className="admin-cell-strong">{row.name || '—'}</div>
+                        <div className="admin-cell-muted">{row.email}</div>
+                      </td>
+                      <td>{row.company || '—'}</td>
+                      <td>
+                        <a
+                          href={row.website_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="admin-table-link"
                         >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {hostFromUrl(row.website_url)}
+                        </a>
+                      </td>
+                      <td>
+                        <span className={badge.className}>{badge.label}</span>
+                      </td>
+                      <td>
+                        <div className="admin-row-actions">
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn-secondary admin-btn-compact"
+                            disabled={actionLoading}
+                            onClick={() => openEdit(row)}
+                          >
+                            Edit
+                          </button>
+                          <div className="admin-more">
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-ghost admin-btn-compact"
+                              onClick={() =>
+                                setMenuOpenId((id) => (id === row.id ? null : row.id))
+                              }
+                            >
+                              More ▾
+                            </button>
+                            {menuOpenId === row.id ? (
+                              <div className="admin-more-menu">
+                                <a
+                                  href={row.website_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="admin-more-item"
+                                  onClick={() => setMenuOpenId(null)}
+                                >
+                                  Open Website
+                                </a>
+                                <button
+                                  type="button"
+                                  className="admin-more-item admin-more-item-danger"
+                                  onClick={() => {
+                                    setMenuOpenId(null)
+                                    setConfirmDeleteIds([row.id])
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
 
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px' }}>
-            <button className="btn btn-ghost" disabled={page === 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ fontSize: '12px' }}>← Prev</button>
-            <span style={{ color: 'var(--t-400)', fontSize: '12px' }}>{page} / {totalPages}</span>
-            <button className="btn btn-ghost" disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ fontSize: '12px' }}>Next →</button>
+        {totalPages > 1 ? (
+          <div className="admin-pagination">
+            <button
+              type="button"
+              className="admin-btn admin-btn-ghost"
+              disabled={page === 1 || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </button>
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              className="admin-btn admin-btn-ghost"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </button>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {editing && form && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '620px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: '#0f1117', boxShadow: '0 24px 70px rgba(0,0,0,0.45)', overflow: 'hidden' }}>
-            <div style={{ padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)' }}>
+      {editing && form ? (
+        <div className="admin-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="admin-modal admin-modal-wide">
+            <div className="admin-modal-header">
               <div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--t-100)', fontSize: '16px' }}>Edit Lead</div>
-                <div style={{ fontSize: '11px', color: 'var(--t-400)', marginTop: '3px' }}>{editing.email}</div>
+                <div className="admin-modal-title">Edit Lead</div>
+                <div className="admin-modal-subtitle">{editing.email}</div>
               </div>
-              <button onClick={() => { setEditing(null); setForm(null) }} style={{ background: 'none', border: 'none', color: 'var(--t-400)', fontSize: '22px', cursor: 'pointer' }}>×</button>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => {
+                  setEditing(null)
+                  setForm(null)
+                }}
+              >
+                ×
+              </button>
             </div>
-
-            <div style={{ padding: '22px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--t-300)' }}>
-                Name
-                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={controlStyle} />
+            <div className="admin-modal-form">
+              <label className="admin-field">
+                <span>Name</span>
+                <input
+                  className="admin-input"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--t-300)' }}>
-                Company
-                <input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={controlStyle} />
+              <label className="admin-field">
+                <span>Company</span>
+                <input
+                  className="admin-input"
+                  value={form.company}
+                  onChange={(e) => setForm({ ...form, company: e.target.value })}
+                />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--t-300)' }}>
-                Email *
-                <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={controlStyle} />
+              <label className="admin-field">
+                <span>Email *</span>
+                <input
+                  className="admin-input"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--t-300)' }}>
-                Report Type *
-                <input value={form.requestedReportType} onChange={e => setForm({ ...form, requestedReportType: e.target.value })} style={controlStyle} />
+              <label className="admin-field">
+                <span>Requested Report Type *</span>
+                <select
+                  className="admin-input"
+                  value={form.requestedReportType}
+                  onChange={(e) =>
+                    setForm({ ...form, requestedReportType: e.target.value })
+                  }
+                >
+                  <option value="detailed">detailed</option>
+                  <option value="snapshot">snapshot</option>
+                  <option value="pdf">pdf</option>
+                </select>
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--t-300)', gridColumn: '1 / -1' }}>
-                Website *
-                <input value={form.websiteUrl} onChange={e => setForm({ ...form, websiteUrl: e.target.value })} style={controlStyle} />
+              <label className="admin-field admin-field-full">
+                <span>Website *</span>
+                <input
+                  className="admin-input"
+                  value={form.websiteUrl}
+                  onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })}
+                />
               </label>
             </div>
-
-            <div style={{ padding: '16px 22px 20px', display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--glass-border)' }}>
-              <button className="btn btn-secondary" disabled={actionLoading} onClick={() => { setEditing(null); setForm(null) }} style={{ fontSize: '12px' }}>Cancel</button>
-              <button className="btn btn-primary" disabled={actionLoading} onClick={saveEdit} style={{ fontSize: '12px' }}>
-                {actionLoading ? 'Saving...' : 'Save Changes'}
+            <div className="admin-modal-actions">
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary"
+                disabled={actionLoading}
+                onClick={() => {
+                  setEditing(null)
+                  setForm(null)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-primary"
+                disabled={actionLoading}
+                onClick={saveEdit}
+              >
+                {actionLoading ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
+
+      <AdminConfirmModal
+        open={Boolean(confirmDeleteIds?.length)}
+        title={
+          confirmDeleteIds?.length === 1
+            ? 'Delete this lead?'
+            : `Delete ${confirmDeleteIds?.length || 0} leads?`
+        }
+        body="This permanently removes the selected lead records. Generated reports are separate and are not deleted."
+        confirmLabel="Delete"
+        danger
+        busy={actionLoading}
+        onCancel={() => setConfirmDeleteIds(null)}
+        onConfirm={() => performDelete(confirmDeleteIds || [])}
+      />
     </main>
+  )
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="admin-loading">
+          <div className="loader" />
+        </div>
+      }
+    >
+      <LeadsPageInner />
+    </Suspense>
   )
 }

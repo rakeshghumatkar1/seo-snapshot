@@ -104,10 +104,21 @@ function LeadsPageInner() {
       setMenuOpenId(null)
       setMenuPos(null)
     }
-    window.addEventListener('scroll', close, true)
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest('.admin-more')) return
+      close()
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close()
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
     window.addEventListener('resize', close)
     return () => {
-      window.removeEventListener('scroll', close, true)
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('resize', close)
     }
   }, [menuOpenId])

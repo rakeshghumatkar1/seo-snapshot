@@ -26,9 +26,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "SEO & Business Visibility Snapshot | Think Big Digital",
+  title: "Search & Growth Report | Think Big Digital",
   description:
-    "Get a free, business-friendly review of your website's visible SEO, content and trust opportunities from Think Big Digital.",
+    "Get a free, business-focused review of your website’s search visibility, trust, AI discovery and enquiry readiness — with clear priorities on what to improve first.",
   metadataBase: new URL(CANONICAL_ORIGIN),
   alternates: {
     canonical: CANONICAL_ORIGIN,

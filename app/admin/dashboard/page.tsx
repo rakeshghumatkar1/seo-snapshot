@@ -3,82 +3,36 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
+import AdminOverview, { type OverviewStats } from '@/components/admin/AdminOverview'
 
-interface Stats {
-  leads: {
-    total: number
-    pdfCount: number
-    detailedCount: number
-  }
+type Stats = OverviewStats & {
   ratings: {
     total: number
     avgRating: number
-  }
-  reports: {
-    total: number
-    snapshotCount: number
-    detailedCount: number
   }
   rateLimits: {
     activeIps: number
     totalRequests: number
   }
-  todayActivity?: {
-    requests: number
-    uniqueIps: number
-  }
   dailyLeads: Array<{ date: string; count: number }>
-  dailyReports: Array<{ date: string; count: number }>
-  topDomains: Array<{ website_url: string; count: number }>
   ratingDistribution: Array<{ rating: number; count: number }>
 }
 
-type SectionName = 'Overview' | 'Prompt Editor' | 'Leads' | 'Reports' | 'Ratings' | 'Rate Limits'
+type SectionName = 'Overview' | 'Leads' | 'Reports' | 'Ratings' | 'Rate Limits' | 'Prompt Editor'
 type TableName = 'leads' | 'ratings' | 'reports' | 'rate_limits'
 
-const NAV_ITEMS: SectionName[] = ['Overview', 'Prompt Editor', 'Leads', 'Reports', 'Ratings', 'Rate Limits']
+const NAV_ITEMS: SectionName[] = [
+  'Overview',
+  'Leads',
+  'Reports',
+  'Ratings',
+  'Rate Limits',
+  'Prompt Editor',
+]
 
 const TABLE_MAP: Partial<Record<SectionName, TableName>> = {
-  Leads: 'leads',
-  Reports: 'reports',
   Ratings: 'ratings',
   'Rate Limits': 'rate_limits',
-}
-
-function WeeklyBarChart({ data }: { data: Array<{ date: string; count: number }> }) {
-  const days: Array<{ label: string; count: number }> = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const iso = d.toISOString().split('T')[0]
-    const label = d.toLocaleDateString('en-US', { weekday: 'short' })
-    const found = data.find(r => String(r.date).startsWith(iso))
-    days.push({ label, count: found ? Number(found.count) : 0 })
-  }
-  const max = Math.max(...days.map(d => d.count), 1)
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '160px', paddingBottom: '4px' }}>
-      {days.map((d, i) => (
-        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%' }}>
-          <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
-            <div
-              title={`${d.count} reports`}
-              style={{
-                width: '100%',
-                height: `${Math.max((d.count / max) * 100, d.count > 0 ? 6 : 0)}%`,
-                background: d.count > 0 ? 'linear-gradient(to top, #10b981, #34d399)' : 'rgba(255,255,255,0.06)',
-                borderRadius: '4px 4px 0 0',
-                minHeight: '2px',
-                transition: 'height 0.3s ease',
-              }}
-            />
-          </div>
-          <div style={{ fontSize: '10px', color: 'var(--t-400)', fontWeight: 500 }}>{d.label}</div>
-          {d.count > 0 && <div style={{ fontSize: '10px', color: '#34d399', fontWeight: 700, marginTop: '-4px' }}>{d.count}</div>}
-        </div>
-      ))}
-    </div>
-  )
 }
 
 function buildDiffLines(
@@ -116,7 +70,6 @@ export default function AdminDashboard() {
   const [tableLoading, setTableLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [exportLoading, setExportLoading] = useState<string | null>(null)
-  const [domainFilter, setDomainFilter] = useState<string | null>(null)
 
   // Prompts
   const [activePromptTab, setActivePromptTab] = useState<'snapshot' | 'detailed'>('snapshot')
@@ -205,17 +158,22 @@ export default function AdminDashboard() {
   }, [activeSection, page, loadTable])
 
   function handleSectionChange(section: SectionName) {
+    if (section === 'Leads') {
+      router.push('/admin/dashboard/leads')
+      return
+    }
+    if (section === 'Reports') {
+      router.push('/admin/dashboard/reports')
+      return
+    }
     setActiveSection(section)
-    if (section !== 'Reports') setDomainFilter(null)
     setSearchQuery('')
     setPage(1)
   }
 
   function handleDomainClick(domain: string) {
-    setDomainFilter(domain)
-    setActiveSection('Reports')
-    setSearchQuery('')
-    setPage(1)
+    const host = domain.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    router.push(`/admin/dashboard/reports?q=${encodeURIComponent(host)}`)
   }
 
   async function exportCSV(table: TableName) {
@@ -434,11 +392,6 @@ export default function AdminDashboard() {
     ? Object.keys(tableData[0]).filter(c => c !== 'id' && c !== 'company')
     : []
   const filteredData = tableData.filter(row => {
-    if (activeSection === 'Reports' && domainFilter) {
-      const url = String(row.website_url ?? '')
-      const domain = domainFilter.replace(/https?:\/\//, '').replace(/\/$/, '')
-      if (!url.includes(domain)) return false
-    }
     if (searchQuery) {
       return Object.values(row).some(v =>
         String(v ?? '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -514,6 +467,7 @@ export default function AdminDashboard() {
         <nav style={{ flex: 1, padding: '12px 0' }}>
           {NAV_ITEMS.map(item => {
             const isActive = activeSection === item
+            const isUtility = item === 'Prompt Editor'
             return (
               <button
                 key={item}
@@ -525,13 +479,14 @@ export default function AdminDashboard() {
                   background: isActive ? 'rgba(15,118,110,0.1)' : 'transparent',
                   border: 'none',
                   boxShadow: isActive ? 'inset 3px 0 0 #0f766e' : 'inset 3px 0 0 transparent',
-                  color: isActive ? '#0f766e' : 'var(--t-300)',
+                  color: isActive ? '#0f766e' : isUtility ? 'var(--t-400)' : 'var(--t-300)',
                   fontSize: '13px',
-                  fontWeight: 600,
+                  fontWeight: isUtility ? 500 : 600,
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                   letterSpacing: '0.01em',
                   display: 'block',
+                  opacity: isUtility && !isActive ? 0.85 : 1,
                 }}
                 onMouseEnter={e => {
                   if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(15,23,42,0.04)'
@@ -564,89 +519,17 @@ export default function AdminDashboard() {
 
         {/* ── OVERVIEW ── */}
         {activeSection === 'Overview' && (
-          <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 700, color: 'var(--t-100)', marginBottom: '24px' }}>
-              Overview
-            </h1>
-
-            {/* Stat cards */}
-            {!stats ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280' }}>
-                Loading stats...
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' }}>
-                {[
-                  { label: 'Total Leads', value: stats.leads.total, sub: `${stats.leads.pdfCount} PDF · ${stats.leads.detailedCount} Detailed`, color: '#10b981' },
-                  { label: 'Reports Generated', value: stats.reports.total, sub: `${stats.reports.snapshotCount} Snapshot · ${stats.reports.detailedCount} Detailed`, color: '#6366f1' },
-                  { label: 'Avg Rating', value: stats.ratings.avgRating ? `${stats.ratings.avgRating}★` : 'N/A', sub: `${stats.ratings.total} total ratings`, color: '#f59e0b' },
-                  { label: 'Active Users Today', value: stats.todayActivity?.uniqueIps || stats.rateLimits.activeIps, sub: `${stats.todayActivity?.requests || stats.rateLimits.totalRequests} requests today`, color: '#3b82f6' },
-                ].map(card => (
-                  <div key={card.label} className="glass" style={{ padding: '20px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--t-300)', marginBottom: '8px' }}>
-                      {card.label}
-                    </div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '30px', fontWeight: 800, color: card.color, lineHeight: 1, marginBottom: '6px' }}>
-                      {card.value}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--t-400)' }}>{card.sub}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Chart + Domains row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {/* Bar chart */}
-              <div className="glass" style={{ padding: '24px' }}>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '15px', fontWeight: 700, color: 'var(--t-100)', marginBottom: '20px' }}>
-                  Reports Last 7 Days
-                </h2>
-                <WeeklyBarChart data={stats?.dailyReports || []} />
-              </div>
-
-              {/* Top domains */}
-              <div className="glass" style={{ padding: '24px' }}>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '15px', fontWeight: 700, color: 'var(--t-100)', marginBottom: '16px' }}>
-                  Top Analyzed Domains
-                </h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {(stats?.topDomains || []).slice(0, 8).map((d, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleDomainClick(d.website_url)}
-                      style={{
-                        background: 'rgba(16,185,129,0.08)',
-                        border: '1px solid rgba(16,185,129,0.2)',
-                        borderRadius: '8px',
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        color: 'var(--t-200)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '7px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.15)'
-                        ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.4)'
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.08)'
-                        ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)'
-                      }}
-                    >
-                      <span>{d.website_url.replace(/https?:\/\//, '').replace(/\/$/, '')}</span>
-                      <span style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399', padding: '1px 7px', borderRadius: '100px', fontSize: '11px', fontWeight: 700 }}>
-                        {d.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+          !stats ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280' }}>
+              Loading stats...
             </div>
-          </div>
+          ) : (
+            <AdminOverview
+              stats={stats}
+              onOpenPromptEditor={() => handleSectionChange('Prompt Editor')}
+              onDomainClick={handleDomainClick}
+            />
+          )
         )}
 
         {/* ── PROMPT EDITOR ── */}
@@ -951,13 +834,6 @@ export default function AdminDashboard() {
                   {activeSection}
                 </h1>
 
-                {domainFilter && activeSection === 'Reports' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '100px', padding: '3px 10px', fontSize: '12px', color: '#34d399', flexShrink: 0 }}>
-                    <span>{domainFilter.replace(/https?:\/\//, '').replace(/\/$/, '')}</span>
-                    <button onClick={() => setDomainFilter(null)} style={{ background: 'none', border: 'none', color: '#34d399', cursor: 'pointer', padding: 0, fontSize: '15px', lineHeight: 1 }}>×</button>
-                  </div>
-                )}
-
                 <input
                   type="text"
                   placeholder="Search..."
@@ -999,7 +875,7 @@ export default function AdminDashboard() {
                 </div>
               ) : filteredData.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px', color: 'var(--t-300)', fontSize: '14px' }}>
-                  {searchQuery || domainFilter ? 'No matching rows on this page' : `No data in ${activeSection.toLowerCase()}`}
+                  {searchQuery ? 'No matching rows on this page' : `No data in ${activeSection.toLowerCase()}`}
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>

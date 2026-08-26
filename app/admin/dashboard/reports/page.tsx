@@ -470,6 +470,7 @@ export default function ReportsLibraryPage() {
             >
               <option value="all">All</option>
               <option value="published">Published Sample</option>
+              <option value="needs_review">Needs Review</option>
               <option value="draft">Draft Sample</option>
               <option value="none">No Sample</option>
             </select>

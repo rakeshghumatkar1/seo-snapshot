@@ -67,6 +67,11 @@ export async function GET(req: NextRequest) {
         AND hs.anonymization_status = 'published'
         AND hs.use_as_sample = TRUE
       )`)
+    } else if (sample === 'needs_review') {
+      clauses.push(`(
+        hs.sample_content_mode = 'anonymized'
+        AND hs.anonymization_status = 'needs_review'
+      )`)
     } else if (sample === 'draft') {
       clauses.push(`(
         (

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySessionToken } from '@/lib/admin/auth'
+import { authenticateSessionToken } from '@/lib/admin/authVerify'
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   if (
@@ -12,13 +12,11 @@ export function middleware(req: NextRequest) {
     pathname.startsWith('/api/admin/export')
   ) {
     const session = req.cookies.get('admin_session')
+    const auth = await authenticateSessionToken(session?.value)
 
-    if (!session?.value || !verifySessionToken(session.value)) {
+    if (!auth.ok) {
       if (pathname.startsWith('/api/')) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        )
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
       return NextResponse.redirect(new URL('/admin', req.url))
     }

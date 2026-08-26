@@ -1,4 +1,5 @@
 import AdminQuickNav from '@/components/admin/AdminQuickNav'
+import AdminSessionKeeper from '@/components/admin/AdminSessionKeeper'
 
 export default function AdminLayout({
   children,
@@ -8,6 +9,7 @@ export default function AdminLayout({
   return (
     <div className="admin-shell">
       <AdminQuickNav />
+      <AdminSessionKeeper />
       {children}
     </div>
   )

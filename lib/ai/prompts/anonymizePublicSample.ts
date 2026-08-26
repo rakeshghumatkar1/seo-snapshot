@@ -133,7 +133,7 @@ ${JSON.stringify({ sections: input.candidateSections })}`
 
 export const PRIVACY_AUDIT_SYSTEM_PROMPT = `You are a privacy auditor for public anonymised report samples.
 
-Determine whether the candidate anonymised report still contains information that could reasonably identify the original organisation.
+Determine whether the CANDIDATE anonymised report still contains information that could reasonably identify the original organisation.
 
 Inspect specifically for:
 - company names
@@ -148,7 +148,25 @@ Inspect specifically for:
 - exact addresses
 - distinctive claims that trivially identify the organisation
 
-The generic company label, business category, and allowed public location are APPROVED and should not be treated as leaks.
+APPROVED / NEVER FLAG AS LEAKS:
+- The Admin-supplied generic company label (it is intentional public-safe metadata)
+- The Admin-supplied business category
+- The Admin-supplied public location
+- Generic phrases like "the business", "the company", "the website", "the organisation"
+
+CRITICAL ISSUE RULES:
+Every issue MUST include:
+- section: exact candidate section key
+- text: the EXACT offending substring copied from the CANDIDATE section (not from the source report)
+- reason: brief explanation
+
+Invalid issues (do not invent these):
+- empty text
+- text that does not appear verbatim in that candidate section
+- flagging the approved generic company label merely because it looks like a company name
+- quoting the original company name from the SOURCE when it is absent from the CANDIDATE
+
+If you cannot quote an exact offending substring from the candidate, do not report an issue.
 
 Return ONLY JSON:
 {"safe":true|false,"issues":[{"section":"...","text":"...","reason":"..."}]}
@@ -167,15 +185,15 @@ export function buildPrivacyAuditUserPrompt(input: {
 }): string {
   return `Audit whether this anonymised candidate still identifies the original organisation.
 
-APPROVED GENERIC LABEL: ${input.genericLabel}
+APPROVED GENERIC LABEL (never flag merely for appearing): ${input.genericLabel}
 APPROVED CATEGORY: ${input.businessCategory}
 APPROVED PUBLIC LOCATION: ${input.publicLocation}
-ORIGINAL DOMAIN (must not appear): ${input.originalDomain}
-ORIGINAL WEBSITE URL (must not appear): ${input.originalWebsiteUrl}
+ORIGINAL DOMAIN (must not appear in candidate): ${input.originalDomain}
+ORIGINAL WEBSITE URL (must not appear in candidate): ${input.originalWebsiteUrl}
 
-SOURCE REPORT (private reference):
+SOURCE REPORT (private reference only — do NOT copy names from here into issue.text unless they also appear in the candidate):
 ${JSON.stringify({ sections: input.sourceSections })}
 
-CANDIDATE ANONYMISED REPORT:
+CANDIDATE ANONYMISED REPORT (issue.text must be copied from HERE):
 ${JSON.stringify({ sections: input.candidateSections })}`
 }

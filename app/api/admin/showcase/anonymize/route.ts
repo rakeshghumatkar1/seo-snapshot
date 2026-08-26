@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import { dbQuery } from '@/lib/db/client'
-import { generateAnonymizedSampleContent } from '@/lib/anonymize/generateAnonymizedSample'
+import {
+  generateAnonymizedSampleContent,
+  recheckSavedSectionsPrivacy,
+} from '@/lib/anonymize/generateAnonymizedSample'
 import {
   runDeterministicPrivacyScan,
   scanSectionsForIdentifiers,
@@ -33,6 +36,23 @@ export const maxDuration = 120
 export const runtime = 'nodejs'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function sectionsFromShowcase(row: any): Record<string, string> | null {
+  const raw = row?.anonymized_sections_json
+  if (!raw || typeof raw !== 'object') return null
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === 'string') out[k] = v
+  }
+  return Object.keys(out).length ? out : null
+}
+
+function privacyCheckLabel(status: string) {
+  if (status === 'ready' || status === 'published') return 'Passed'
+  if (status === 'needs_review') return 'Needs Review'
+  if (status === 'failed') return 'Failed'
+  return status
+}
 
 async function loadReport(reportId: string) {
   const rows = await dbQuery(
@@ -413,7 +433,7 @@ export async function POST(req: NextRequest) {
       const status = residual.length ? 'needs_review' : 'ready'
       const saved = await saveAnonymizedDraft({
         reportId,
-        sections: scan.cleanedSections,
+        sections: sectionsForStore,
         reportVersion: resolved.version,
         status,
         audit: {
@@ -428,6 +448,73 @@ export async function POST(req: NextRequest) {
         status,
         privacyCheck: residual.length ? 'Needs Review' : 'Passed',
         residual,
+        showcase: saved,
+        preview: publicSafePreview(saved, report),
+      })
+    }
+
+    if (action === 'recheck_privacy') {
+      if (!existing || existing.sample_content_mode !== 'anonymized') {
+        return NextResponse.json({ error: 'No anonymised draft exists' }, { status: 404 })
+      }
+      const currentSections = sectionsFromShowcase(existing)
+      if (!currentSections) {
+        return NextResponse.json({ error: 'Anonymised sections are missing' }, { status: 400 })
+      }
+
+      const sectionsJson =
+        typeof report.sections_json === 'object' && report.sections_json
+          ? (report.sections_json as Record<string, unknown>)
+          : {}
+      const resolved = resolveExpectedKeysFromReport(sectionsJson, reportType)
+      const label = String(
+        body.genericLabel || body.publicDisplayName || existing.public_display_name || ''
+      ).trim()
+      const category = String(
+        body.businessCategory || existing.business_category || ''
+      ).trim()
+      const location = String(
+        body.publicLocation || existing.public_location || ''
+      ).trim()
+      if (!label) {
+        return NextResponse.json(
+          { error: 'Generic company label is required before privacy re-check' },
+          { status: 400 }
+        )
+      }
+
+      const result = await recheckSavedSectionsPrivacy({
+        sections: currentSections,
+        genericLabel: label,
+        businessCategory: category,
+        publicLocation: location,
+        originalDomain: normalizeDomain(report.website_url),
+        websiteUrl: report.website_url,
+        sourceSections: resolved.sourceSections,
+        reportType,
+      })
+
+      const saved = await saveAnonymizedDraft({
+        reportId,
+        sections: currentSections,
+        reportVersion: resolved.version,
+        status: result.status,
+        audit: {
+          deterministicPassed: result.deterministicPassed,
+          audit: result.audit,
+          discardedIssues: result.discardedIssues,
+          note: 'recheck_privacy',
+          aiCalls: 1,
+        },
+      })
+
+      return NextResponse.json({
+        success: true,
+        status: result.status,
+        privacyCheck: privacyCheckLabel(result.status),
+        audit: result.audit,
+        deterministicPassed: result.deterministicPassed,
+        discardedIssues: result.discardedIssues,
         showcase: saved,
         preview: publicSafePreview(saved, report),
       })
@@ -545,16 +632,54 @@ export async function POST(req: NextRequest) {
       if (row.anonymization_status === 'failed') {
         return NextResponse.json({ error: 'Cannot publish a failed anonymisation' }, { status: 400 })
       }
-      if (row.anonymization_status === 'needs_review') {
-        return NextResponse.json(
-          {
-            error: 'Cannot publish yet. Privacy check found identifying information.',
-            privacyCheck: 'Needs Review',
+
+      // Stale needs_review: one automatic re-check of CURRENT final sections (max 1 AI audit)
+      let publishRow = row
+      if (publishRow.anonymization_status === 'needs_review') {
+        const currentSections = sectionsFromShowcase(publishRow)
+        if (!currentSections) {
+          return NextResponse.json({ error: 'Anonymised sections are missing' }, { status: 400 })
+        }
+        const recheck = await recheckSavedSectionsPrivacy({
+          sections: currentSections,
+          genericLabel: String(publishRow.public_display_name || '').trim(),
+          businessCategory: String(publishRow.business_category || '').trim(),
+          publicLocation: String(publishRow.public_location || '').trim(),
+          originalDomain: normalizeDomain(report.website_url),
+          websiteUrl: report.website_url,
+          sourceSections: resolved.sourceSections,
+          reportType,
+        })
+        const savedRecheck = await saveAnonymizedDraft({
+          reportId,
+          sections: currentSections,
+          reportVersion: resolved.version,
+          status: recheck.status,
+          audit: {
+            deterministicPassed: recheck.deterministicPassed,
+            audit: recheck.audit,
+            discardedIssues: recheck.discardedIssues,
+            note: 'publish_recheck',
+            aiCalls: 1,
           },
-          { status: 400 }
-        )
+        })
+        if (recheck.status !== 'ready') {
+          return NextResponse.json(
+            {
+              error: 'Cannot publish yet. Privacy check found identifying information.',
+              privacyCheck: 'Needs Review',
+              audit: recheck.audit,
+              discardedIssues: recheck.discardedIssues,
+              showcase: savedRecheck,
+              preview: publicSafePreview(savedRecheck, report),
+            },
+            { status: 400 }
+          )
+        }
+        publishRow = (await getShowcaseByReportId(reportId)) || savedRecheck || publishRow
       }
-      if (!['ready', 'draft', 'published'].includes(String(row.anonymization_status))) {
+
+      if (!['ready', 'draft', 'published'].includes(String(publishRow.anonymization_status))) {
         return NextResponse.json(
           { error: 'Anonymised sample is not ready to publish' },
           { status: 400 }
@@ -562,7 +687,7 @@ export async function POST(req: NextRequest) {
       }
 
       const validation = validateAnonymizedStructure(
-        { sections: row.anonymized_sections_json },
+        { sections: publishRow.anonymized_sections_json },
         resolved.keys,
         resolved.sourceSections
       )
@@ -592,10 +717,10 @@ export async function POST(req: NextRequest) {
         reportVersion: resolved.version,
         status: 'ready',
         audit:
-          row.anonymization_audit_json ||
+          publishRow.anonymization_audit_json ||
           {
             note:
-              row.anonymization_status === 'draft'
+              publishRow.anonymization_status === 'draft'
                 ? 'promoted_draft_on_publish'
                 : 'normalized_on_publish',
           },

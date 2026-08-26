@@ -69,6 +69,7 @@ export default function AnonymizedSampleDrawer({
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [rechecking, setRechecking] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successNote, setSuccessNote] = useState<string | null>(null)
@@ -135,18 +136,22 @@ export default function AnonymizedSampleDrawer({
     return out
   }, [sectionDraft, reportType, version])
   const hasDraft = Object.keys(sectionDraft).length > 0
-  const busy = generating || publishing
+  const busy = generating || publishing || rechecking
 
   const applyServerPayload = useCallback(
     (data: any) => {
       if (data.privacyCheck) setPrivacyCheck(data.privacyCheck)
-      if (data.audit?.issues) setAuditIssues(data.audit.issues)
+      if (data.audit?.issues) {
+        setAuditIssues(
+          (data.audit.issues as any[]).filter((i) => i && String(i.text || '').trim())
+        )
+      }
       if (Array.isArray(data.residual) && data.residual.length) {
         setAuditIssues(
           data.residual.map((r: any) => ({
             section: r.section || '',
-            reason: `${r.type || 'identifier'}: ${r.match || 'found'}`,
-            text: '',
+            reason: `${r.type || 'identifier'} remains.`,
+            text: String(r.match || ''),
           }))
         )
       }
@@ -257,7 +262,7 @@ export default function AnonymizedSampleDrawer({
               : null
       )
       const issues = sc?.anonymization_audit_json?.audit?.issues
-      setAuditIssues(Array.isArray(issues) ? issues : [])
+      setAuditIssues(Array.isArray(issues) ? issues.filter((i: any) => i?.text) : [])
       setMetaSaveState('idle')
       setSectionSaveState('idle')
 
@@ -362,7 +367,7 @@ export default function AnonymizedSampleDrawer({
 
   // Debounced metadata autosave
   useEffect(() => {
-    if (!readyRef.current || busyRef.current || generating || publishing) return
+    if (!readyRef.current || busyRef.current || generating || publishing || rechecking) return
     if (!form.genericLabel.trim()) return
     if (metaTimer.current) clearTimeout(metaTimer.current)
     metaTimer.current = setTimeout(() => {
@@ -371,11 +376,11 @@ export default function AnonymizedSampleDrawer({
     return () => {
       if (metaTimer.current) clearTimeout(metaTimer.current)
     }
-  }, [form, generating, publishing, saveMetaNow])
+  }, [form, generating, publishing, rechecking, saveMetaNow])
 
   // Debounced section autosave — ONLY after genuine user edits (dirty)
   useEffect(() => {
-    if (!readyRef.current || busyRef.current || generating || publishing) return
+    if (!readyRef.current || busyRef.current || generating || publishing || rechecking) return
     if (!sectionDirtyRef.current) return
     if (!Object.keys(sectionDraft).length) return
     if (sectionTimer.current) clearTimeout(sectionTimer.current)
@@ -386,7 +391,7 @@ export default function AnonymizedSampleDrawer({
     return () => {
       if (sectionTimer.current) clearTimeout(sectionTimer.current)
     }
-  }, [sectionDraft, generating, publishing, saveSectionsNow])
+  }, [sectionDraft, generating, publishing, rechecking, saveSectionsNow])
 
   async function generateSample() {
     if (hasDraft) {
@@ -447,6 +452,39 @@ export default function AnonymizedSampleDrawer({
     } finally {
       setGenerating(false)
       setPreparingMeta(false)
+      busyRef.current = false
+    }
+  }
+
+  async function recheckPrivacy() {
+    setRechecking(true)
+    busyRef.current = true
+    setError(null)
+    setSuccessNote(null)
+    try {
+      const data = await apiPost('recheck_privacy')
+      if (!data) return
+      applyServerPayload(data)
+      const issues = data.audit?.issues
+      setAuditIssues(Array.isArray(issues) ? issues.filter((i: any) => i?.text) : [])
+      if (data.privacyCheck) setPrivacyCheck(data.privacyCheck)
+      setSuccessNote(
+        data.status === 'ready'
+          ? 'Privacy re-check passed. Ready to publish.'
+          : 'Privacy re-check still found supported issues.'
+      )
+    } catch (err: any) {
+      setError(err?.message || 'Privacy re-check failed.')
+      if (err?.data) {
+        applyServerPayload(err.data)
+        if (err.data.privacyCheck) setPrivacyCheck(err.data.privacyCheck)
+        const issues = err.data.audit?.issues
+        if (Array.isArray(issues)) {
+          setAuditIssues(issues.filter((i: any) => i?.text))
+        }
+      }
+    } finally {
+      setRechecking(false)
       busyRef.current = false
     }
   }
@@ -513,10 +551,13 @@ export default function AnonymizedSampleDrawer({
   const canPublish =
     hasDraft &&
     Boolean(form.genericLabel.trim()) &&
-    privacyCheck === 'Passed' &&
     preview?.anonymizationStatus !== 'failed' &&
-    preview?.anonymizationStatus !== 'needs_review' &&
-    preview?.anonymizationStatus !== 'generating'
+    preview?.anonymizationStatus !== 'generating' &&
+    (privacyCheck === 'Passed' ||
+      preview?.anonymizationStatus === 'needs_review' ||
+      preview?.anonymizationStatus === 'ready' ||
+      preview?.anonymizationStatus === 'draft' ||
+      preview?.anonymizationStatus === 'published')
 
   const draftLabel = hasDraft ? 'Saved' : 'Not created'
   const publishedLabel = preview?.useAsSample ? 'Yes' : 'No'
@@ -876,11 +917,25 @@ export default function AnonymizedSampleDrawer({
                   }}
                 >
                   <div style={{ fontWeight: 700, marginBottom: '6px' }}>Privacy issues</div>
-                  {auditIssues.slice(0, 8).map((issue, idx) => (
-                    <div key={idx} style={{ marginBottom: '4px' }}>
-                      {issue.section}: {issue.reason}
-                    </div>
-                  ))}
+                  {auditIssues.slice(0, 8).map((issue, idx) => {
+                    const label = getSectionLabel(
+                      String(issue.section || ''),
+                      reportType,
+                      version
+                    )
+                    const title = label?.title || issue.section || 'Unknown section'
+                    return (
+                      <div key={idx} style={{ marginBottom: '8px', lineHeight: 1.45 }}>
+                        <div style={{ fontWeight: 700 }}>{title}</div>
+                        {issue.text ? (
+                          <div>
+                            Found: &quot;{String(issue.text).slice(0, 160)}&quot;
+                          </div>
+                        ) : null}
+                        {issue.reason ? <div>Reason: {issue.reason}</div> : null}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
 
@@ -998,10 +1053,27 @@ export default function AnonymizedSampleDrawer({
                 disabled={busy || !canPublish}
                 onClick={publishToHomepage}
                 style={actionBtn}
-                title={!canPublish ? 'Privacy must pass before publish' : 'Publish to homepage'}
+                title={
+                  preview?.anonymizationStatus === 'needs_review'
+                    ? 'Will re-check current text, then publish if safe'
+                    : !canPublish
+                      ? 'Complete metadata and draft before publish'
+                      : 'Publish to homepage'
+                }
               >
                 {publishing ? 'Publishing…' : 'Publish to Homepage'}
               </button>
+              {preview?.anonymizationStatus === 'needs_review' ? (
+                <button
+                  className="btn btn-secondary"
+                  disabled={busy}
+                  onClick={recheckPrivacy}
+                  style={actionBtn}
+                  title="Re-audit current saved sections without regenerating"
+                >
+                  {rechecking ? 'Re-checking…' : 'Re-check Privacy'}
+                </button>
+              ) : null}
               <a
                 href={`/admin/dashboard/reports/anonymized-preview/${encodeURIComponent(report.id)}`}
                 target="_blank"

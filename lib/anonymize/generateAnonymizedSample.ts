@@ -7,9 +7,10 @@ import {
   buildAnonymizeUserPrompt,
   buildPrivacyAuditUserPrompt,
 } from '@/lib/ai/prompts/anonymizePublicSample'
-import { runDeterministicPrivacyScan } from './privacyScan'
+import { runDeterministicPrivacyScan, scanSectionsForIdentifiers } from './privacyScan'
 import { parseJsonObject, validateAnonymizedStructure } from './structure'
 import { normalizeAnonymizedBusinessReferences } from './normalizeBusinessReferences'
+import { applyValidatedPrivacyAudit } from './privacyAuditValidate'
 import type { PrivacyAuditResult, PrivacyIssue } from './types'
 
 async function callAnonymizeOnce(input: {
@@ -116,6 +117,119 @@ function normalizeAudit(result: PrivacyAuditResult): PrivacyAuditResult {
   }
 }
 
+/**
+ * Prepare the EXACT final text that will be saved, then privacy-audit that text.
+ * Order: deterministic cleanup → business-ref normalize → cleanup again →
+ * normalize → residual detect → AI audit on that exact text → validate issues.
+ */
+export async function finalizeSectionsWithPrivacyAudit(input: {
+  sections: Record<string, string>
+  genericLabel: string
+  businessCategory: string
+  publicLocation: string
+  originalDomain: string
+  websiteUrl: string
+  sourceSections: Record<string, string>
+  reportType: 'snapshot' | 'detailed'
+}): Promise<{
+  sections: Record<string, string>
+  audit: PrivacyAuditResult
+  deterministicPassed: boolean
+  discardedIssues: PrivacyIssue[]
+}> {
+  let sections = input.sections
+
+  let scan = runDeterministicPrivacyScan(sections, input.websiteUrl)
+  sections = scan.cleanedSections
+  sections = normalizeAnonymizedBusinessReferences(sections, input.genericLabel)
+
+  scan = runDeterministicPrivacyScan(sections, input.websiteUrl)
+  sections = scan.cleanedSections
+  sections = normalizeAnonymizedBusinessReferences(sections, input.genericLabel)
+
+  const residual = scanSectionsForIdentifiers(sections, input.websiteUrl)
+  const deterministicPassed = residual.length === 0
+
+  const rawAudit = normalizeAudit(
+    await runPrivacyAudit({
+      genericLabel: input.genericLabel,
+      businessCategory: input.businessCategory,
+      publicLocation: input.publicLocation,
+      originalDomain: input.originalDomain,
+      originalWebsiteUrl: input.websiteUrl,
+      sourceSections: input.sourceSections,
+      candidateSections: sections,
+      reportType: input.reportType,
+    })
+  )
+
+  const validated = applyValidatedPrivacyAudit(
+    rawAudit,
+    sections,
+    deterministicPassed
+  )
+
+  return {
+    sections,
+    audit: { safe: validated.safe, issues: validated.issues },
+    deterministicPassed,
+    discardedIssues: validated.discardedIssues,
+  }
+}
+
+/**
+ * Audit-only re-check against CURRENT saved sections (no regeneration).
+ * Does not mutate section prose.
+ */
+export async function recheckSavedSectionsPrivacy(input: {
+  sections: Record<string, string>
+  genericLabel: string
+  businessCategory: string
+  publicLocation: string
+  originalDomain: string
+  websiteUrl: string
+  sourceSections: Record<string, string>
+  reportType: 'snapshot' | 'detailed'
+}): Promise<{
+  status: 'ready' | 'needs_review'
+  audit: PrivacyAuditResult
+  deterministicPassed: boolean
+  discardedIssues: PrivacyIssue[]
+}> {
+  const residual = scanSectionsForIdentifiers(input.sections, input.websiteUrl)
+  const deterministicPassed = residual.length === 0
+
+  const rawAudit = normalizeAudit(
+    await runPrivacyAudit({
+      genericLabel: input.genericLabel,
+      businessCategory: input.businessCategory,
+      publicLocation: input.publicLocation,
+      originalDomain: input.originalDomain,
+      originalWebsiteUrl: input.websiteUrl,
+      sourceSections: input.sourceSections,
+      candidateSections: input.sections,
+      reportType: input.reportType,
+    })
+  )
+
+  const validated = applyValidatedPrivacyAudit(
+    rawAudit,
+    input.sections,
+    deterministicPassed
+  )
+
+  const audit = { safe: validated.safe, issues: validated.issues }
+  const status: 'ready' | 'needs_review' =
+    audit.safe && deterministicPassed ? 'ready' : 'needs_review'
+
+  return {
+    status,
+    audit,
+    deterministicPassed,
+    discardedIssues: validated.discardedIssues,
+  }
+}
+
 export type AnonymizeGenerationResult = {
   ok: boolean
   status: 'draft' | 'ready' | 'needs_review' | 'failed'
@@ -124,11 +238,13 @@ export type AnonymizeGenerationResult = {
   deterministicPassed: boolean
   error?: string
   aiCalls: number
+  discardedIssues?: PrivacyIssue[]
 }
 
 /**
  * Bounded AI workflow:
- * generation (+ optional structural repair) + audit (+ optional privacy repair + final audit)
+ * generation (+ optional structural repair) + finalize(cleanup→normalize→scan→audit)
+ * optional privacy repair + finalize again
  * Max anonymisation generation/repair calls: 2
  * Max audits: 2
  */
@@ -167,14 +283,16 @@ export async function generateAnonymizedSampleContent(input: {
     aiCalls += 1
     first = await callAnonymizeOnce({
       systemPrompt: ANONYMIZE_SYSTEM_PROMPT,
-      userPrompt: buildAnonymizeUserPrompt({
-        genericLabel: input.genericLabel,
-        businessCategory: input.businessCategory,
-        publicLocation: input.publicLocation,
-        reportType: input.reportType,
-        sectionKeys: input.expectedKeys,
-        sourceSections: input.sourceSections,
-      }) + `\n\nPREVIOUS ATTEMPT FAILED STRUCTURAL VALIDATION:\n${first.error || 'invalid'}`,
+      userPrompt:
+        buildAnonymizeUserPrompt({
+          genericLabel: input.genericLabel,
+          businessCategory: input.businessCategory,
+          publicLocation: input.publicLocation,
+          reportType: input.reportType,
+          sectionKeys: input.expectedKeys,
+          sourceSections: input.sourceSections,
+        }) +
+        `\n\nPREVIOUS ATTEMPT FAILED STRUCTURAL VALIDATION:\n${first.error || 'invalid'}`,
       reportType: input.reportType,
       expectedKeys: input.expectedKeys,
       sourceSections: input.sourceSections,
@@ -195,49 +313,33 @@ export async function generateAnonymizedSampleContent(input: {
 
   console.log('[AnonymizedSample] Structural validation passed')
 
-  let sections = first.sections
-  let scan = runDeterministicPrivacyScan(sections, input.websiteUrl)
-  sections = scan.cleanedSections
-
-  if (scan.passed) {
-    console.log('[AnonymizedSample] Deterministic privacy scan passed')
-  } else {
-    console.log('[AnonymizedSample] Deterministic privacy scan cleaned residual identifiers')
-    scan = runDeterministicPrivacyScan(sections, input.websiteUrl)
-    sections = scan.cleanedSections
-  }
-
   aiCalls += 1
-  let audit = normalizeAudit(
-    await runPrivacyAudit({
-      genericLabel: input.genericLabel,
-      businessCategory: input.businessCategory,
-      publicLocation: input.publicLocation,
-      originalDomain: input.originalDomain,
-      originalWebsiteUrl: input.websiteUrl,
-      sourceSections: input.sourceSections,
-      candidateSections: sections,
-      reportType: input.reportType,
-    })
-  )
+  let finalized = await finalizeSectionsWithPrivacyAudit({
+    sections: first.sections,
+    genericLabel: input.genericLabel,
+    businessCategory: input.businessCategory,
+    publicLocation: input.publicLocation,
+    originalDomain: input.originalDomain,
+    websiteUrl: input.websiteUrl,
+    sourceSections: input.sourceSections,
+    reportType: input.reportType,
+  })
 
-  if (audit.safe && scan.passed) {
+  if (finalized.audit.safe && finalized.deterministicPassed) {
     console.log('[AnonymizedSample] Privacy audit passed')
     return {
       ok: true,
       status: 'ready',
-      sections: normalizeAnonymizedBusinessReferences(sections, input.genericLabel),
-      audit,
+      sections: finalized.sections,
+      audit: finalized.audit,
       deterministicPassed: true,
       aiCalls,
+      discardedIssues: finalized.discardedIssues,
     }
   }
 
-  if (!audit.safe) {
+  if (!finalized.audit.safe || !finalized.deterministicPassed) {
     console.log('[AnonymizedSample] Privacy audit failed — one repair attempt')
-    // Only if we still have generation budget (max 2 generation/repair calls used so far for structure)
-    // Spec: generation + audit; if repair: ONE repair + ONE final audit
-    // We've used 1-2 for generation. Repair is separate.
     aiCalls += 1
     const repaired = await callAnonymizeOnce({
       systemPrompt: ANONYMIZE_REPAIR_SYSTEM_PROMPT,
@@ -246,8 +348,16 @@ export async function generateAnonymizedSampleContent(input: {
         businessCategory: input.businessCategory,
         publicLocation: input.publicLocation,
         sectionKeys: input.expectedKeys,
-        candidateSections: sections,
-        issues: audit.issues,
+        candidateSections: finalized.sections,
+        issues: finalized.audit.issues.length
+          ? finalized.audit.issues
+          : [
+              {
+                section: '_audit',
+                text: '',
+                reason: 'Deterministic privacy identifiers remain',
+              },
+            ],
       }),
       reportType: input.reportType,
       expectedKeys: input.expectedKeys,
@@ -255,48 +365,43 @@ export async function generateAnonymizedSampleContent(input: {
     })
 
     if (repaired.sections) {
-      sections = repaired.sections
-      scan = runDeterministicPrivacyScan(sections, input.websiteUrl)
-      sections = scan.cleanedSections
       aiCalls += 1
-      audit = normalizeAudit(
-        await runPrivacyAudit({
-          genericLabel: input.genericLabel,
-          businessCategory: input.businessCategory,
-          publicLocation: input.publicLocation,
-          originalDomain: input.originalDomain,
-          originalWebsiteUrl: input.websiteUrl,
-          sourceSections: input.sourceSections,
-          candidateSections: sections,
-          reportType: input.reportType,
-        })
-      )
+      finalized = await finalizeSectionsWithPrivacyAudit({
+        sections: repaired.sections,
+        genericLabel: input.genericLabel,
+        businessCategory: input.businessCategory,
+        publicLocation: input.publicLocation,
+        originalDomain: input.originalDomain,
+        websiteUrl: input.websiteUrl,
+        sourceSections: input.sourceSections,
+        reportType: input.reportType,
+      })
     }
   }
 
-  sections = normalizeAnonymizedBusinessReferences(sections, input.genericLabel)
-
-  if (audit.safe && scan.passed) {
+  if (finalized.audit.safe && finalized.deterministicPassed) {
     console.log('[AnonymizedSample] Privacy audit passed after repair')
     return {
       ok: true,
       status: 'ready',
-      sections,
-      audit,
+      sections: finalized.sections,
+      audit: finalized.audit,
       deterministicPassed: true,
       aiCalls,
+      discardedIssues: finalized.discardedIssues,
     }
   }
 
-  if (!scan.passed) {
+  if (!finalized.deterministicPassed) {
     return {
       ok: false,
       status: 'needs_review',
-      sections,
-      audit,
+      sections: finalized.sections,
+      audit: finalized.audit,
       deterministicPassed: false,
       error: 'Deterministic privacy scan still found identifiers',
       aiCalls,
+      discardedIssues: finalized.discardedIssues,
     }
   }
 
@@ -304,9 +409,10 @@ export async function generateAnonymizedSampleContent(input: {
   return {
     ok: true,
     status: 'needs_review',
-    sections,
-    audit,
-    deterministicPassed: scan.passed,
+    sections: finalized.sections,
+    audit: finalized.audit,
+    deterministicPassed: finalized.deterministicPassed,
     aiCalls,
+    discardedIssues: finalized.discardedIssues,
   }
 }

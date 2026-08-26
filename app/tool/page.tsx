@@ -3,7 +3,10 @@
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LoadingState from '@/components/ui/LoadingState';
-import { sanitizeUrl } from '@/lib/url/sanitize'
+import {
+  normalizePublicWebsiteInput,
+  WEBSITE_URL_INVALID_MESSAGE,
+} from '@/lib/url/publicWebsiteInput'
 
 export default function ToolPage() {
   return (
@@ -17,27 +20,9 @@ export default function ToolPage() {
   );
 }
 
-function isValidInput(url: string): boolean {
-  const cleaned = url.trim()
-  if (!cleaned) return false
-  const withProtocol = cleaned.startsWith('http')
-    ? cleaned
-    : 'https://' + cleaned
-  try {
-    sanitizeUrl(withProtocol)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function normalizeUrl(url: string): string {
-  const cleaned = url.trim()
-  return cleaned.startsWith('http') ? cleaned : 'https://' + cleaned
-}
-
 function ToolContent() {
   const [url, setUrl] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rateLimitData, setRateLimitData] = useState<{
@@ -50,12 +35,19 @@ function ToolContent() {
   const hasAutoTriggered = useRef(false);
 
   const handleGenerate = useCallback(async (inputUrl: string) => {
-    if (!isValidInput(inputUrl)) return;
+    let normalized: string
+    try {
+      normalized = normalizePublicWebsiteInput(inputUrl)
+      setUrlError(null)
+    } catch {
+      setUrlError(WEBSITE_URL_INVALID_MESSAGE)
+      return
+    }
 
     setIsLoading(true);
     setError(null);
     setRateLimitData(null);
-    const normalized = normalizeUrl(inputUrl);
+
 
     try {
       const response = await fetch('/api/report/snapshot', {
@@ -205,16 +197,35 @@ function ToolContent() {
           </p>
 
           {/* Form */}
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
+            <label htmlFor="website-url" className="sr-only">
+              Website URL
+            </label>
             <input
               id="website-url"
               type="text"
+              inputMode="url"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                setUrl(e.target.value)
+                if (urlError) setUrlError(null)
+              }}
               placeholder="yourdomain.com"
-              className="input input-hero mb-4"
-              aria-label="Website URL"
+              className="input input-hero mb-2"
+              autoComplete="url"
+              aria-invalid={urlError ? true : undefined}
+              aria-describedby={
+                urlError ? 'tool-url-helper tool-url-error' : 'tool-url-helper'
+              }
             />
+            <p id="tool-url-helper" className="public-tool-form-helper">
+              Enter your website address — https:// will be added automatically.
+            </p>
+            {urlError ? (
+              <p id="tool-url-error" className="public-tool-form-error" role="alert">
+                {urlError}
+              </p>
+            ) : null}
             <button type="submit" className="btn btn-primary btn-lg pulse w-full justify-center">
               Generate Free Snapshot
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">

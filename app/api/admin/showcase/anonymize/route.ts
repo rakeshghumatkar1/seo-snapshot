@@ -31,6 +31,10 @@ import { missingMetadataMessages } from '@/lib/anonymize/sampleMetadataHelpers'
 import { suggestAnonymizedSampleMetadata } from '@/lib/anonymize/suggestSampleMetadata'
 import { normalizeAnonymizedBusinessReferences } from '@/lib/anonymize/normalizeBusinessReferences'
 import { shouldNoOpPublishedSectionSave } from '@/lib/anonymize/sectionDraftCompare'
+import {
+  isDetailedReportType,
+  PUBLIC_SAMPLE_DETAILED_ONLY_MESSAGE,
+} from '@/lib/homepage/publicSampleRules'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -189,6 +193,17 @@ export async function POST(req: NextRequest) {
 
     const reportType = report.report_type === 'detailed' ? 'detailed' : 'snapshot'
     const existing = await getShowcaseByReportId(reportId)
+
+    // Snapshot reports cannot become NEW public homepage samples.
+    if (
+      !isDetailedReportType(report.report_type) &&
+      (action === 'generate' || action === 'publish')
+    ) {
+      return NextResponse.json(
+        { error: PUBLIC_SAMPLE_DETAILED_ONLY_MESSAGE },
+        { status: 400 }
+      )
+    }
 
     if (action === 'save_meta') {
       const publicDisplayName = String(body.genericLabel || body.publicDisplayName || '').trim().slice(0, 120)

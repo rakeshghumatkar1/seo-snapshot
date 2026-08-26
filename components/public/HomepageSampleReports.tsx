@@ -33,7 +33,9 @@ function ReportThumbnail({
         <div className="public-sample-thumb-header">
           <div className="public-sample-thumb-brand">
             <span className="public-sample-thumb-mark">{initial}</span>
-            <span className="public-sample-thumb-brand-text">SEO Snapshot</span>
+            <span className="public-sample-thumb-brand-text">
+              {reportType === 'detailed' ? 'SEO Detailed Report' : 'SEO Snapshot'}
+            </span>
           </div>
           <span
             className={`public-sample-thumb-pill ${

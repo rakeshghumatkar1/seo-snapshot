@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminAuthenticated } from '@/lib/admin/auth'
 import { dbQuery } from '@/lib/db/client'
 import {
+  isDetailedReportType,
+  PUBLIC_SAMPLE_DETAILED_ONLY_MESSAGE,
+} from '@/lib/homepage/publicSampleRules'
+import {
   ensureHomepageShowcaseSchema,
   ensureUniqueSlug,
   getShowcaseByReportId,
@@ -73,6 +77,13 @@ export async function POST(req: NextRequest) {
     const displayOrder = Number.isFinite(Number(body.displayOrder))
       ? Math.max(0, Math.min(9999, Number(body.displayOrder)))
       : 0
+
+    if (useAsSample && !isDetailedReportType(reportRows[0].report_type)) {
+      return NextResponse.json(
+        { error: PUBLIC_SAMPLE_DETAILED_ONLY_MESSAGE },
+        { status: 400 }
+      )
+    }
 
     const publicDisplayName = String(body.publicDisplayName || '').trim().slice(0, 120)
     if ((isActive || useAsSample || showRecentlyAnalysed) && !publicDisplayName) {

@@ -2647,14 +2647,52 @@ body:has(.public-site) .noise-overlay {
 }
 
 .public-sample-thumb-brand-text {
-  font-size: 0.54rem;
+  font-size: 0.46rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: rgba(15, 23, 42, 0.42);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.public-form-helper {
+  display: block;
+  text-align: left;
+  margin-top: 0.45rem;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.public-form-error {
+  display: block;
+  text-align: left;
+  margin-top: 0.4rem;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #fecaca;
+}
+
+.public-tool-form-helper {
+  display: block;
+  margin: -0.35rem 0 0.85rem;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--t-300, #94a3b8);
+}
+
+.public-tool-form-error {
+  display: block;
+  margin: -0.55rem 0 0.85rem;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #f87171;
 }
 
 .public-sample-thumb-pill {

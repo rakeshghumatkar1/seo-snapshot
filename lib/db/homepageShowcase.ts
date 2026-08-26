@@ -137,6 +137,7 @@ export async function getPublicHomepageShowcase(): Promise<{
       WHERE hs.is_active = TRUE
         AND hs.use_as_sample = TRUE
         AND COALESCE(r.status, 'success') = 'success'
+        AND r.report_type = 'detailed'
         AND hs.sample_content_mode = 'anonymized'
         AND hs.anonymization_status = 'published'
         AND hs.anonymized_sections_json IS NOT NULL
@@ -162,6 +163,7 @@ export async function getPublicHomepageShowcase(): Promise<{
       WHERE hs.is_active = TRUE
         AND hs.use_as_sample = TRUE
         AND COALESCE(r.status, 'success') = 'success'
+        AND r.report_type = 'detailed'
         AND COALESCE(hs.sample_content_mode, 'source') = 'source'
       ORDER BY hs.featured DESC, hs.display_order ASC, hs.updated_at DESC
       LIMIT 12
@@ -282,6 +284,7 @@ export async function getPublicSampleBySlug(slug: string) {
        AND hs.is_active = TRUE
        AND hs.use_as_sample = TRUE
        AND COALESCE(r.status, 'success') = 'success'
+       AND r.report_type = 'detailed'
        AND (
          COALESCE(hs.sample_content_mode, 'source') = 'source'
          OR (

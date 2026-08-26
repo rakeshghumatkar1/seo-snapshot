@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { sanitizeUrl } from '@/lib/url/sanitize';
+import {
+  normalizePublicWebsiteInput,
+  WEBSITE_URL_INVALID_MESSAGE,
+} from '@/lib/url/publicWebsiteInput';
 import ServiceConversionSection from '@/components/public/ServiceConversionSection';
 import HomepageUsageStats from '@/components/public/HomepageUsageStats';
 import HomepageSampleReports, {
@@ -11,22 +14,6 @@ import HomepageSampleReports, {
 } from '@/components/public/HomepageSampleReports';
 import HomepageSeoCaseStudies from '@/components/public/HomepageSeoCaseStudies';
 
-function isValidInput(url: string): boolean {
-  const cleaned = url.trim();
-  if (!cleaned) return false;
-  const withProtocol = cleaned.startsWith('http') ? cleaned : 'https://' + cleaned;
-  try {
-    sanitizeUrl(withProtocol);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function normalizeUrl(url: string): string {
-  const cleaned = url.trim();
-  return cleaned.startsWith('http') ? cleaned : 'https://' + cleaned;
-}
 
 const SNAPSHOT_FEATURES = [
   'Visible business positioning',
@@ -71,6 +58,7 @@ function FeatureList({ items }: { items: string[] }) {
 
 export default function Home() {
   const [url, setUrl] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
   const router = useRouter();
   const [usageStats, setUsageStats] = useState({
     websitesAnalysed: 0,
@@ -78,6 +66,7 @@ export default function Home() {
     detailedReportsCreated: 0,
   });
   const [sampleReports, setSampleReports] = useState<SampleReportCard[]>([]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -100,10 +89,15 @@ export default function Home() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidInput(url)) return;
-    const normalized = normalizeUrl(url);
-    router.push(`/tool?url=${encodeURIComponent(normalized)}`);
+    try {
+      const normalized = normalizePublicWebsiteInput(url);
+      setUrlError(null);
+      router.push(`/tool?url=${encodeURIComponent(normalized)}`);
+    } catch {
+      setUrlError(WEBSITE_URL_INVALID_MESSAGE);
+    }
   };
+
 
   return (
     <div>
@@ -162,6 +156,7 @@ export default function Home() {
           onSubmit={handleSubmit}
           className="fade-up delay-3 w-full public-hero-form"
           aria-label="Generate a free SEO Snapshot"
+          noValidate
         >
           <label htmlFor="homepage-url" className="public-form-label">
             Website URL
@@ -169,13 +164,20 @@ export default function Home() {
           <div className="flex gap-2.5 flex-col sm:flex-row">
             <input
               id="homepage-url"
-              type="url"
+              type="text"
               inputMode="url"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                if (urlError) setUrlError(null);
+              }}
               placeholder="yourdomain.com"
               className="input input-hero w-full min-w-0 sm:flex-1"
               autoComplete="url"
+              aria-invalid={urlError ? true : undefined}
+              aria-describedby={
+                urlError ? 'homepage-url-helper homepage-url-error' : 'homepage-url-helper'
+              }
             />
             <button type="submit" className="btn btn-primary btn-lg w-full sm:w-auto whitespace-nowrap">
               Generate Free Snapshot
@@ -190,6 +192,14 @@ export default function Home() {
               </svg>
             </button>
           </div>
+          <p id="homepage-url-helper" className="public-form-helper">
+            Enter your website address — https:// will be added automatically.
+          </p>
+          {urlError ? (
+            <p id="homepage-url-error" className="public-form-error" role="alert">
+              {urlError}
+            </p>
+          ) : null}
         </form>
 
         <div className="fade-up delay-4 flex gap-2 mt-5 justify-center flex-wrap">

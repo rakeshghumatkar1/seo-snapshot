@@ -39,7 +39,7 @@ export default function Header() {
     <>
       <header className="public-header sticky top-0 z-50">
         <nav className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
-          <div className="public-header-inner flex justify-between items-center gap-3 lg:gap-5">
+          <div className="public-header-inner flex justify-between items-center gap-2 lg:gap-3">
             {/* Brand lockup: stacked dark logo + product name */}
             <div className="public-header-brand flex items-center shrink-0">
               <BrandLogo size="header" />
@@ -49,8 +49,8 @@ export default function Header() {
               </Link>
             </div>
 
-            {/* Desktop nav only at 2xl+ so laptop widths use compact menu without overlap */}
-            <div className="public-header-desktop-nav hidden 2xl:flex items-center gap-0.5">
+            {/* Desktop nav at xl+ */}
+            <div className="public-header-desktop-nav hidden xl:flex items-center gap-0.5">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
                 return (
@@ -85,14 +85,14 @@ export default function Header() {
             </div>
 
             {/* Desktop CTA */}
-            <div className="hidden 2xl:flex items-center shrink-0">
+            <div className="hidden xl:flex items-center shrink-0">
               <Link href="/tool" className="btn btn-primary public-header-cta">
                 Review My Website
               </Link>
             </div>
 
-            {/* Compact menu until 2xl */}
-            <div className="flex 2xl:hidden items-center shrink-0">
+            {/* Compact menu below xl */}
+            <div className="flex xl:hidden items-center shrink-0">
               <button
                 type="button"
                 className="public-mobile-menu-btn"
@@ -116,7 +116,7 @@ export default function Header() {
       {mobileOpen && (
         <div
           id="mobile-nav-panel"
-          className="public-mobile-nav 2xl:hidden"
+          className="public-mobile-nav xl:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation"

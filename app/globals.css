@@ -1224,7 +1224,7 @@ body:has(.public-site) .noise-overlay {
 @media (min-width: 1280px) {
   .public-nav-link {
     font-size: 1rem; /* 16px */
-    padding: 8px 12px;
+    padding: 8px 8px; /* tighter so full xl nav fits with CTA */
   }
 }
 .public-nav-link:hover {
@@ -1254,7 +1254,7 @@ body:has(.public-site) .noise-overlay {
   .public-header-cta {
     min-height: 48px !important;
     height: 48px !important;
-    padding: 0 28px !important;
+    padding: 0 20px !important; /* tighter so xl desktop row fits without overlap */
     font-size: 1rem !important; /* 16px */
   }
 }

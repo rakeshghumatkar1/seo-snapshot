@@ -91,20 +91,25 @@ Write the Snapshot V3 report now using only the evidence package above.
 Use the exact 10 output keys required by the system prompt.`
 }
 
-/** Appended on the one-time completeness repair attempt. Reuses the same evidence context. */
+/** Appended on the one-time targeted completeness repair attempt. */
 export function buildSnapshotRepairSuffix(missingMarkers: string[]): string {
   const list = missingMarkers.map((marker) => `- ${marker}`).join('\n')
   return `
 
-Your previous response was structurally incomplete because it omitted required section markers:
+STRUCTURAL REPAIR REQUEST
+
+The previous Snapshot omitted these required sections:
 ${list}
 
-Regenerate the COMPLETE Snapshot report from the supplied evidence.
-Your replacement response MUST contain all 10 required V3 Snapshot markers exactly once, in the expected structure and order.
-Do not return only the missing sections.
-Do not rename markers.
-Do not omit sections.
-Preserve grounding requirements: use only the supplied evidence and do not invent facts.
-Do not refer to the previous formatting failure in the customer-facing report.
-The final output must read as a normal complete Snapshot report.`
+Return ONLY the missing section(s) listed above.
+For every requested section:
+- output the exact marker exactly as written, on its own line
+- then write a complete grounded section body
+- use only the supplied website evidence
+- do not invent facts
+- do not output any section that was not requested
+- do not rename, paraphrase, or format the marker as a human-readable heading
+- do not mention this repair request in the customer-facing content
+
+The response must begin with the first missing marker and contain every missing marker exactly once.`
 }

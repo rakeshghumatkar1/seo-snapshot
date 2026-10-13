@@ -1,11 +1,8 @@
+import { SNAPSHOT_SECTION_MARKERS_V3 } from '../parseReportV3'
+
 export function isValidSnapshotV3Prompt(content: string): boolean {
   const text = content || ''
-  return [
-    'BUSINESS_CUSTOMER_UNDERSTANDING:',
-    'SEARCH_OPPORTUNITY:',
-    'AI_DISCOVERY_READINESS:',
-    'TOP_PRIORITY_ACTIONS:',
-  ].every(marker => text.includes(marker))
+  return SNAPSHOT_SECTION_MARKERS_V3.every(marker => text.includes(marker))
 }
 
 export function isValidDetailedV3Prompt(content: string): boolean {

@@ -1,13 +1,17 @@
 /**
- * Snapshot V3 Auto-Repair structural smoke tests (no network / no AI).
+ * Snapshot V3 targeted auto-repair structural smoke tests (no network / no AI).
  * Run: npx tsx scripts/smoke-snapshot-auto-repair.ts
  */
 import {
   SNAPSHOT_SECTION_MARKERS_V3,
   validateSnapshotMarkers,
 } from '../lib/ai/parseReportV3'
-import { shouldRetrySnapshotForMissingMarkers } from '../lib/ai/generateSnapshotReport'
+import {
+  mergeSnapshotRepairSections,
+  shouldRetrySnapshotForMissingMarkers,
+} from '../lib/ai/generateSnapshotReport'
 import { buildSnapshotRepairSuffix } from '../lib/ai/prompts/snapshotPrompt'
+import { isValidSnapshotV3Prompt } from '../lib/ai/prompts/promptValidation'
 
 function buildFixture(omit: string[] = []): string {
   return SNAPSHOT_SECTION_MARKERS_V3.map((marker) => {
@@ -33,85 +37,82 @@ assert(checkA.retry === false, 'TEST A: retry should be false for complete respo
 assert(checkA.missing.length === 0, 'TEST A: missing should be empty')
 assert(validateSnapshotMarkers(complete).valid === true, 'TEST A: markers valid')
 
-// TEST B — EXACT PRODUCTION FAILURE SHAPE
-const prodFailure = buildFixture([
-  'TRADITIONAL_SEARCH_READINESS:',
-  'AI_DISCOVERY_READINESS:',
-])
+// TEST B — EXACT CURRENT PRODUCTION FAILURE SHAPE
+const prodFailure = buildFixture(['AI_DISCOVERY_READINESS:'])
 const checkB = shouldRetrySnapshotForMissingMarkers(prodFailure)
-assert(checkB.retry === true, 'TEST B: retry should be true for prod failure shape')
+assert(checkB.retry === true, 'TEST B: retry should be true for production failure')
 assert(
-  sameMembers(checkB.missing, [
-    'TRADITIONAL_SEARCH_READINESS:',
-    'AI_DISCOVERY_READINESS:',
-  ]),
+  checkB.missing.length === 1 && checkB.missing[0] === 'AI_DISCOVERY_READINESS:',
   `TEST B: missing mismatch: ${checkB.missing.join('|')}`
 )
 
-// TEST C — ONE MARKER MISSING
-const oneMissing = buildFixture(['ENQUIRY_READINESS:'])
-const checkC = shouldRetrySnapshotForMissingMarkers(oneMissing)
-assert(checkC.retry === true, 'TEST C: retry should be true')
-assert(
-  checkC.missing.length === 1 && checkC.missing[0] === 'ENQUIRY_READINESS:',
-  `TEST C: expected ENQUIRY_READINESS: got ${checkC.missing.join('|')}`
-)
-
-// TEST D — MULTIPLE MARKERS MISSING
+// TEST C — MULTIPLE MARKERS MISSING
 const multiMissing = buildFixture([
-  'SEARCH_OPPORTUNITY:',
-  'TRUST_REPUTATION:',
-  'LIMITS_NEXT_STEP:',
+  'TRADITIONAL_SEARCH_READINESS:',
+  'AI_DISCOVERY_READINESS:',
 ])
-const checkD = shouldRetrySnapshotForMissingMarkers(multiMissing)
-assert(checkD.retry === true, 'TEST D: retry should be true')
+const checkC = shouldRetrySnapshotForMissingMarkers(multiMissing)
 assert(
-  sameMembers(checkD.missing, [
-    'SEARCH_OPPORTUNITY:',
-    'TRUST_REPUTATION:',
-    'LIMITS_NEXT_STEP:',
+  sameMembers(checkC.missing, [
+    'TRADITIONAL_SEARCH_READINESS:',
+    'AI_DISCOVERY_READINESS:',
   ]),
-  `TEST D: missing mismatch: ${checkD.missing.join('|')}`
+  `TEST C: missing mismatch: ${checkC.missing.join('|')}`
 )
 
-// TEST E — REPAIRED RESPONSE COMPLETE (structural path simulation)
-const firstCheck = shouldRetrySnapshotForMissingMarkers(prodFailure)
-assert(firstCheck.retry === true, 'TEST E: first response should request repair')
-const repairSuffix = buildSnapshotRepairSuffix(firstCheck.missing)
+// TEST D — REPAIR PROMPT ASKS ONLY FOR MISSING SECTION(S)
+const repairSuffix = buildSnapshotRepairSuffix(checkC.missing)
 assert(
-  repairSuffix.includes('TRADITIONAL_SEARCH_READINESS:') &&
-    repairSuffix.includes('AI_DISCOVERY_READINESS:') &&
-    repairSuffix.includes('COMPLETE Snapshot'),
-  'TEST E: repair suffix must name missing markers and demand full report'
-)
-const repaired = buildFixture()
-const repairCheck = validateSnapshotMarkers(repaired)
-assert(repairCheck.valid === true, 'TEST E: repaired response must pass validation')
-assert(
-  shouldRetrySnapshotForMissingMarkers(repaired).retry === false,
-  'TEST E: repaired response must not request another retry'
+  repairSuffix.includes('Return ONLY the missing section(s)') &&
+    repairSuffix.includes('TRADITIONAL_SEARCH_READINESS:') &&
+    repairSuffix.includes('AI_DISCOVERY_READINESS:'),
+  'TEST D: targeted repair suffix is incomplete'
 )
 
-// TEST F — REPAIR STILL INVALID (no third attempt implied by flow)
-const stillBroken = buildFixture(['AI_DISCOVERY_READINESS:'])
-const secondCheck = validateSnapshotMarkers(stillBroken)
-assert(secondCheck.valid === false, 'TEST F: second response still invalid')
+// TEST E — TARGETED REPAIR MERGES INTO ORIGINAL IN CANONICAL ORDER
+const targetedRepair = [
+  'TRADITIONAL_SEARCH_READINESS:',
+  'Repaired traditional search readiness body with enough grounded detail for structural testing.',
+  '',
+  'AI_DISCOVERY_READINESS:',
+  'Repaired AI discovery readiness body with enough grounded detail for structural testing.',
+].join('\n')
+
+const merged = mergeSnapshotRepairSections(multiMissing, targetedRepair, checkC.missing)
+assert(!!merged, 'TEST E: targeted repair should merge')
+assert(validateSnapshotMarkers(merged || '').valid, 'TEST E: merged report must contain all markers')
 assert(
-  secondCheck.missing.includes('AI_DISCOVERY_READINESS:'),
-  'TEST F: still missing AI_DISCOVERY_READINESS:'
+  SNAPSHOT_SECTION_MARKERS_V3.every((marker, index, markers) =>
+    index === 0 || (merged || '').indexOf(markers[index - 1]) < (merged || '').indexOf(marker)
+  ),
+  'TEST E: merged markers must be in canonical order'
 )
-// Flow contract: after second failure, generator returns null — never a third AI call.
+
+// TEST F — INCOMPLETE TARGETED REPAIR FAILS CLOSED
+const incompleteRepair = 'AI_DISCOVERY_READINESS:\nOnly one repaired section.'
+assert(
+  mergeSnapshotRepairSections(multiMissing, incompleteRepair, checkC.missing) === null,
+  'TEST F: incomplete repair must return null'
+)
+
+// TEST G — DB SNAPSHOT PROMPT VALIDATION REQUIRES ALL 10 MARKERS
+assert(isValidSnapshotV3Prompt(complete), 'TEST G: complete V3 prompt should validate')
+assert(
+  !isValidSnapshotV3Prompt(buildFixture(['ENQUIRY_READINESS:'])),
+  'TEST G: prompt missing any required marker must be rejected'
+)
 
 console.log(
   JSON.stringify({
     ok: true,
     tests: [
       'A-complete',
-      'B-prod-failure-shape',
-      'C-one-missing',
-      'D-multi-missing',
-      'E-repair-success',
-      'F-repair-still-invalid',
+      'B-current-prod-failure',
+      'C-multiple-missing',
+      'D-targeted-repair-prompt',
+      'E-targeted-repair-merge',
+      'F-incomplete-repair-fails',
+      'G-db-prompt-all-markers',
     ],
     markerCount: SNAPSHOT_SECTION_MARKERS_V3.length,
   })

@@ -6,6 +6,7 @@ import {
 } from './prompts/snapshotPrompt'
 import { isValidSnapshotV3Prompt } from './prompts/promptValidation'
 import {
+  SNAPSHOT_SECTION_MARKERS_V3,
   parseSnapshotReportV3,
   validateSnapshotMarkers,
 } from './parseReportV3'
@@ -50,6 +51,52 @@ export function shouldRetrySnapshotForMissingMarkers(raw: string): {
   }
 }
 
+function extractSnapshotBodies(raw: string): Map<string, string> {
+  const positions = SNAPSHOT_SECTION_MARKERS_V3
+    .map(marker => ({ marker, index: raw.indexOf(marker) }))
+    .filter(item => item.index >= 0)
+    .sort((a, b) => a.index - b.index)
+
+  const bodies = new Map<string, string>()
+  for (let i = 0; i < positions.length; i++) {
+    const current = positions[i]
+    const next = positions[i + 1]
+    const start = current.index + current.marker.length
+    const end = next ? next.index : raw.length
+    const body = raw.slice(start, end).trim()
+    if (body) bodies.set(current.marker, body)
+  }
+  return bodies
+}
+
+/**
+ * Merge a targeted repair response into the original Snapshot while preserving
+ * every valid original section. Returns null when any requested repair section
+ * is still absent or empty.
+ */
+export function mergeSnapshotRepairSections(
+  original: string,
+  repair: string,
+  missingMarkers: string[]
+): string | null {
+  const originalBodies = extractSnapshotBodies(original)
+  const repairBodies = extractSnapshotBodies(repair)
+
+  for (const marker of missingMarkers) {
+    const repairedBody = repairBodies.get(marker)
+    if (!repairedBody) return null
+    originalBodies.set(marker, repairedBody)
+  }
+
+  if (SNAPSHOT_SECTION_MARKERS_V3.some(marker => !originalBodies.get(marker))) {
+    return null
+  }
+
+  return SNAPSHOT_SECTION_MARKERS_V3
+    .map(marker => `${marker}\n${originalBodies.get(marker)}`)
+    .join('\n\n')
+}
+
 export async function generateSnapshotReport(
   websiteUrl: string
 ): Promise<{
@@ -84,7 +131,7 @@ export async function generateSnapshotReport(
       '[Snapshot] Initial generation missing markers:',
       initialCheck.missing.join(', ')
     )
-    console.log('[Snapshot] Retrying generation for section completeness')
+    console.log('[Snapshot] Requesting targeted section repair')
 
     const repairPrompt =
       baseUserPrompt + buildSnapshotRepairSuffix(initialCheck.missing)
@@ -95,21 +142,35 @@ export async function generateSnapshotReport(
     })
 
     if (!second.success || !second.text) {
-      console.error('[Snapshot] Auto-repair generation failed:', second.error)
+      console.error('[Snapshot] Targeted repair generation failed:', second.error)
       return null
     }
 
-    rawText = second.text
+    const merged = mergeSnapshotRepairSections(
+      rawText,
+      second.text,
+      initialCheck.missing
+    )
+
+    if (!merged) {
+      console.error(
+        '[Snapshot] Targeted repair did not return every missing marker:',
+        initialCheck.missing.join(', ')
+      )
+      return null
+    }
+
+    rawText = merged
     const repairCheck = validateSnapshotMarkers(rawText)
     if (!repairCheck.valid) {
       console.error(
-        '[Snapshot] Auto-repair failed; missing markers:',
+        '[Snapshot] Auto-repair merge failed; missing markers:',
         repairCheck.missing.join(', ')
       )
       return null
     }
 
-    console.log('[Snapshot] Auto-repair succeeded')
+    console.log('[Snapshot] Targeted auto-repair succeeded')
   }
 
   const sections = parseSnapshotReportV3(rawText)
